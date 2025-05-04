@@ -174,5 +174,5 @@ cython_debug/
 .pypirc
 
 # Erlang files
-.erl
-.beam
+*.erl
+*.beam
