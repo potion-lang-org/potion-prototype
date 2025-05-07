@@ -7,6 +7,7 @@ from typing import List, Tuple, Union
 # TOKENS DEFINITIONS
 # --------------------
 TOKEN_SPEC = [
+    ("RETURN", r"return\b"),
     ("EQ",         r"=="),
     ("NEQ",        r"!="),
     ("LTE",        r"<="),
@@ -26,7 +27,6 @@ TOKEN_SPEC = [
     ("ELSE",       r"else\b"),
     ("ARROW",      r"=>"),
     ("ASSIGN",     r"="),
-    ("ID",         r"[a-zA-Z_][a-zA-Z0-9_]*"),
     ("LBRACE",     r"\{"),
     ("RBRACE",     r"\}"),
     ("LPAREN",     r"\("),
@@ -37,10 +37,13 @@ TOKEN_SPEC = [
     ("STAR",       r"\*"),
     ("SLASH",      r"/"),
     ("COMMA",      r","),
+    ("ID",         r"[a-zA-Z_][a-zA-Z0-9_]*"),
+    ('WHITESPACE', r'\s+'),
     ("NEWLINE",    r"\n"),
     ("SKIP",       r"[ \t]+"),
     ("MISMATCH",   r"."),
-    ("RETURN", r"return\b"),
+    ('COMMENT', r'//[^\n]*'),
+    
 
 ]
 
@@ -57,7 +60,7 @@ def tokenize(code: str) -> List[Token]:
     for match in token_re.finditer(code):
         kind = match.lastgroup
         value = match.group()
-        if kind == "NEWLINE" or kind == "SKIP":
+        if kind in ('WHITESPACE', 'NEWLINE', 'COMMENT', 'SKIP'):
             continue
         elif kind == "MISMATCH":
             raise RuntimeError(f"Unexpected character: {value}")

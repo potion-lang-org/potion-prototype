@@ -57,6 +57,7 @@ class ErlangCodegen:
         value = self.visit(node.value)
         return f"{var_name} = {value}"
 
+
     def visit_FunctionDef(self, node):
         self.lines.append("")
         self.lines.append(f"{node.name}() ->")
@@ -76,18 +77,27 @@ class ErlangCodegen:
             if code:
                 body_lines.append(code)
 
-        # restaurar contexto
-        self.inside_function = prev_inside
-        self.local_vars = prev_locals
-
         if not body_lines:
             self.lines.append("    ok.")
         else:
-            # último é retorno, anteriores com vírgula
-            *stmts, last = body_lines
+            *stmts, last = node.body
             for s in stmts:
-                self.lines.append(f"    {s},")
-            self.lines.append(f"    {last}.")
+                code = self.visit(s)
+                if code:
+                    self.lines.append(f"    {code},")
+            
+            # Se o último é ReturnStatement, pega só o valor; senão, gera normalmente
+            if isinstance(last, ReturnStatement):
+                ret_code = self.visit(last.value)
+                self.lines.append(f"    {ret_code}.")
+            else:
+                last_code = self.visit(last)
+                self.lines.append(f"    {last_code}.")
+
+        # restaurar contexto só DEPOIS de tudo estar gerado
+        self.inside_function = prev_inside
+        self.local_vars = prev_locals
+
 
     def visit_PrintCall(self, node):
         expr = self.visit(node.value)
@@ -111,9 +121,8 @@ class ErlangCodegen:
     def visit_Identifier(self, node):
         if node.name in RESERVED_WORDS:
             return RESERVED_WORDS[node.name]
-        if self.inside_function and node.name in self.local_vars:
-            return self.format_variable(node.name)
-        return f"?{node.name.upper()}"
+        return self.format_variable(node.name)
+
 
     def visit_BinaryOp(self, node):
         left = self.visit(node.left)
@@ -155,5 +164,8 @@ class ErlangCodegen:
         }.get(op, op)
 
     def format_variable(self, name):
-        # variáveis locais capitalizadas, globais minúsculas
-        return name.capitalize() if self.inside_function else name.lower()
+        if self.inside_function and name in self.local_vars:
+            return name.capitalize()
+        return f"?{name.upper()}"
+
+
