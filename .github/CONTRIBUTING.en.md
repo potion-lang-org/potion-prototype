@@ -34,7 +34,7 @@ There are several ways to contribute:
 
 ## Reporting Bugs
 
-If you find a bug, please open an [issue](https://github.com/YOUR_REPO/issues) and include:
+If you find a bug, please open an [issue](https://github.com/potion-lang-org/potion-prototype/issues) and include:
 
 - A clear and descriptive title
 - Steps to reproduce the issue
@@ -48,7 +48,7 @@ If you find a bug, please open an [issue](https://github.com/YOUR_REPO/issues) a
 
 We're always open to new ideas! When suggesting a feature:
 
-- Use [issues](https://github.com/YOUR_REPO/issues) to discuss the idea
+- Use [issues](https://github.com/potion-lang-org/potion-prototype/issues) to discuss the idea
 - Explain the motivation and potential use case
 - Provide any sketches or pseudocode if relevant
 
@@ -87,8 +87,8 @@ To work locally on the project:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/potion-lang-org/potion-prototype.git
+cd potion-prototype
 
 # (If applicable) Set up dependencies or environment
 # For example:

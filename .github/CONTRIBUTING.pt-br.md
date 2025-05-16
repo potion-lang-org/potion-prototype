@@ -34,7 +34,7 @@ Você pode contribuir de várias formas:
 
 ## Relatar Erros (Bugs)
 
-Se você encontrou um bug, por favor, abra uma [issue](https://github.com/SEU_REPOSITORIO/issues) e inclua as seguintes informações:
+Se você encontrou um bug, por favor, abra uma [issue](https://github.com/potion-lang-org/potion-prototype/issues) e inclua as seguintes informações:
 
 - Um título claro e descritivo
 - Passos para reproduzir o erro
@@ -48,7 +48,7 @@ Se você encontrou um bug, por favor, abra uma [issue](https://github.com/SEU_RE
 
 Estamos sempre abertos a novas ideias! Para sugerir uma melhoria:
 
-- Crie uma [issue](https://github.com/SEU_REPOSITORIO/issues) descrevendo a ideia
+- Crie uma [issue](https://github.com/potion-lang-org/potion-prototype/issues) descrevendo a ideia
 - Explique o motivo e a utilidade da sugestão
 - Inclua esboços ou pseudocódigo, se for útil
 
@@ -87,8 +87,8 @@ Para trabalhar localmente no projeto:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/SEU_REPOSITORIO.git
-cd SEU_REPOSITORIO
+git clone https://github.com/potion-lang-org/potion-prototype.git
+cd potion-prototype
 
 # (Se necessário) Configure as dependências ou o ambiente
 # Exemplo:
@@ -96,6 +96,7 @@ cd SEU_REPOSITORIO
 # source venv/bin/activate
 # pip install -r requirements.txt
 ```
+
 Pronto! Agora você pode começar a contribuir 🚀
 
 Agradecemos novamente pelo interesse e pela colaboração 💜
