@@ -1,145 +1,160 @@
 # Potion Language — Design Document
 
-## 📖 Visão Geral
-
-**Potion** é uma linguagem minimalista inspirada em Python, Erlang e Rust, criada para aprendizado, experimentação e geração de código Erlang a partir de uma sintaxe simples e expressiva.  
-Seu foco está em facilitar a escrita de lógica de negócios clara e segura, gerando código eficiente para ambientes concorrentes como BEAM/Erlang VM.
-
----
-
-## ✨ Objetivos
-
-- Sintaxe enxuta, próxima de linguagens modernas (ex.: Python, Rust).
-- Suporte a variáveis imutáveis (`val`) e mutáveis (`var`) no futuro.
-- Funções puras e com efeitos colaterais (ex.: `print`).
-- Condicionais simples (`if`, `else`).
-- Tipos básicos: inteiros, booleanos, strings.
-- Compilação para Erlang legível, usando boas práticas (ex.: `ok`, finalização de blocos, uso correto de variáveis locais e globais).
-- Extensibilidade futura: listas, maps, pattern matching, módulos.
+> 🇧🇷 [Versão em Português](./README-pt-br.md)  
+> 🤝 [Contributing (EN)](./.github/CONTRIBUTING.en.md) • [Contribuindo (PT-BR)](./.github/CONTRIBUTING.pt-br.md)  
+> 📜 [Code of Conduct (EN)](./.github/CODE_OF_CONDUCT.en.md) • [Código de Conduta (PT-BR)](./.github/CODE_OF_CONDUCT.pt-br.md)
 
 ---
 
-## 🏗️ Estrutura da Linguagem
+## 📖 Overview
 
-### Variáveis globais
+**Potion** is a minimalist language inspired by Python, Erlang, and Rust, designed for learning, experimentation, and generating Erlang code from a simple and expressive syntax.  
+Its goal is to make writing business logic clear and safe, producing efficient code for concurrent environments like the BEAM/Erlang VM.
+
+---
+
+## ✨ Goals
+
+- Clean syntax, similar to modern languages (e.g., Python, Rust).
+- Support for immutable (`val`) and future mutable (`var`) variables.
+- Pure functions and side-effect functions (e.g., `print`).
+- Simple conditionals (`if`, `else`).
+- Basic types: integers, booleans, strings.
+- Compilation to readable Erlang using best practices (`ok`, proper block endings, correct use of local/global variables).
+- Future extensibility: lists, maps, pattern matching, modules.
+
+---
+
+## 🏗️ Language Structure
+
+### Global Variables
+
 ```potion
 val x = 5
-val nome = "João"
+val name = "João"
 ```
 
-→ Traduzido como macros Erlang:
+→ Translates to Erlang macros:
+
 ```erlang
 -define(X, 5).
--define(NOME, "João").
+-define(NAME, "João").
 ```
 
 ---
 
-### Funções
+### Functions
+
 ```potion
-fn calcular() {
+fn calculate() {
     val y = x + 3
     return y * 2
 }
 ```
 
-→ Traduzido para Erlang:
+→ Translates to Erlang:
+
 ```erlang
-calcular() ->
+calculate() ->
     Y = (?X + 3),
     (Y * 2).
 ```
 
 ---
 
-### Condicionais (`if`, `else`)
+### Conditionals (`if`, `else`)
+
 ```potion
-fn verificar() {
-    if valor > 0 {
-        print("Maior que zero")
+fn check() {
+    if value > 0 {
+        print("Greater than zero")
     } else {
-        print("Menor ou igual a zero")
+        print("Less than or equal to zero")
     }
 }
 ```
 
-→ Traduzido para Erlang:
+→ Translates to Erlang:
+
 ```erlang
-verificar() ->
-    case (?VALOR > 0) of
+check() ->
+    case (?VALUE > 0) of
         true ->
-            io:format("~p~n", ["Maior que zero"]);
+            io:format("~p~n", ["Greater than zero"]);
         _ ->
-            io:format("~p~n", ["Menor ou igual a zero"])
+            io:format("~p~n", ["Less than or equal to zero"])
     end.
 ```
 
 ---
 
-### Impressão
+### Printing
+
 ```potion
-print("Olá Mundo")
+print("Hello World")
 ```
 
 → Erlang:
+
 ```erlang
-io:format("~p~n", ["Olá Mundo"])
+io:format("~p~n", ["Hello World"])
 ```
 
 ---
 
-## 🛠️ Arquitetura do Compilador
+## 🛠️ Compiler Architecture
 
-- **Parser** → Constrói AST (Abstract Syntax Tree).
-- **Codegen** → Percorre AST e gera código Erlang.
-- **Transpiler** → Usa os dois módulos acima para transformar `.potion` → `.erl`.
-
----
-
-## ⚡ Roadmap (Próximas Features)
-
-- [ ] Tipagem opcional: `val x: int = 5`
-- [ ] Variáveis mutáveis: `var contador = 0`
-- [ ] Estruturas compostas: listas, maps.
-- [ ] Pattern matching.
-- [ ] Módulos e imports.
-- [ ] CLI oficial para compilação e execução.
+- **Parser** → Builds the AST (Abstract Syntax Tree).
+- **Codegen** → Walks through the AST and emits Erlang code.
+- **Transpiler** → Uses the above modules to transform `.potion` → `.erl`.
 
 ---
 
-## 🔥 Exemplo Completo
+## ⚡ Roadmap (Upcoming Features)
+
+- [ ] Optional typing: `val x: int = 5`
+- [ ] Mutable variables: `var counter = 0`
+- [ ] Compound structures: lists, maps
+- [ ] Pattern matching
+- [ ] Modules and imports
+- [ ] Official CLI for compilation and execution
+
+---
+
+## 🔥 Full Example
 
 ```potion
 val base = 10
 
-fn somar_valores() {
+fn sum_values() {
     val a = base + 5
     val b = a * 2
     return b + 3
 }
 
 fn main() {
-    somar_valores()
+    sum_values()
 }
 ```
 
 → Erlang:
+
 ```erlang
 -define(BASE, 10).
 
-somar_valores() ->
+sum_values() ->
     A = (?BASE + 5),
     B = (A * 2),
     (B + 3).
 
 main() ->
-    somar_valores().
+    sum_values().
 ```
 
 ---
 
-## 📜 Filosofia
+## 📜 Philosophy
 
-- **Clareza sobre mágica:** Código explícito vence automação obscura.
-- **Foco pedagógico:** Ajudar novos programadores a entender compiladores e geração de código.
-- **Interoperação:** Integrar bem com o ecossistema Erlang.
+- **Clarity over magic:** Explicit code beats obscure automation.
+- **Educational focus:** Helps new programmers understand compilers and code generation.
+- **Interop-friendly:** Seamlessly integrates with the Erlang ecosystem.
