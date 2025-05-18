@@ -11,3 +11,6 @@ clean:
 
 compile:
 	python3 exemplo.py
+
+potion_tests:
+	python3 -m unittest discover -s tests
