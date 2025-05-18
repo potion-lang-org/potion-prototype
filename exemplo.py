@@ -40,10 +40,10 @@ fn apenas_retorno() {
     return 42
 }
 
-val base = 10
+val base: int = 10
 
 fn somar_valores() {
-    val a = base + 5
+    val a: int = base + 5
     val b = a * 2
     return b + 3
 }

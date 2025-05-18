@@ -112,7 +112,7 @@ io:format("~p~n", ["Hello World"])
 
 ## ⚡ Roadmap (Upcoming Features)
 
-- [ ] Optional typing: `val x: int = 5`
+- [x] Optional typing: `val x: int = 5`
 - [ ] Mutable variables: `var counter = 0`
 - [ ] Compound structures: lists, maps
 - [ ] Pattern matching
@@ -124,7 +124,7 @@ io:format("~p~n", ["Hello World"])
 ## 🔥 Full Example
 
 ```potion
-val base = 10
+val base: int = 10
 
 fn sum_values() {
     val a = base + 5
