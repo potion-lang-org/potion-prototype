@@ -98,7 +98,7 @@ io:format("~p~n", ["Olá Mundo"])
 
 ## ⚡ Roadmap (Próximas Features)
 
-- [ ] Tipagem opcional: `val x: int = 5`
+- [x] Tipagem opcional: `val x: int = 5`
 - [ ] Variáveis mutáveis: `var contador = 0`
 - [ ] Estruturas compostas: listas, maps.
 - [ ] Pattern matching.
@@ -110,7 +110,7 @@ io:format("~p~n", ["Olá Mundo"])
 ## 🔥 Exemplo Completo
 
 ```potion
-val base = 10
+val base: int = 10
 
 fn somar_valores() {
     val a = base + 5
