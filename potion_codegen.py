@@ -6,6 +6,18 @@ RESERVED_WORDS = {
     "none": "undefined",
 }
 
+TYPE_MAP = {
+    "int": int,
+    "str": str,
+    "bool": bool
+}
+
+REVERSE_TYPE_MAP = {
+    int: "int",
+    str: "str",
+    bool: "bool"
+}
+
 class ErlangCodegen:
     def __init__(self, ast, module_name="module_name"):
         self.ast = ast
@@ -15,6 +27,8 @@ class ErlangCodegen:
         self.global_vars = []
         self.local_vars = set()
         self.inside_function = False
+        self.type_env = {}
+        self.variables = {}
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -39,6 +53,12 @@ class ErlangCodegen:
                     value = self.visit(stmt.value)
                     self.global_vars.append((stmt.name, value))
 
+                    self.type_checking(stmt, scope = "global")
+
+                    var_key = self.format_variable(stmt.name)
+                    real_val = self.evaluate_expression(stmt.value)
+                    self.variables[var_key] = real_val
+
     def visit(self, node):
         method_name = f"visit_{type(node).__name__}"
         visitor = getattr(self, method_name, self.generic_visit)
@@ -54,8 +74,82 @@ class ErlangCodegen:
 
     def visit_ValDeclaration(self, node):
         var_name = self.format_variable(node.name)
-        value = self.visit(node.value)
-        return f"{var_name} = {value}"
+        value_code = self.visit(node.value)
+
+        self.type_checking(node, scope = "local")
+
+        return f"{var_name} = {value_code}"
+
+    def type_checking(self, node, scope = "local"):
+        var_name = self.format_variable(node.name)
+        evaluated_value = self.evaluate_expression(node.value)
+
+        # Verificação de tipo, se houver anotação
+        if node.type_annotation:
+            expected_type = TYPE_MAP.get(node.type_annotation)
+            if expected_type is None:
+                raise Exception(f"Tipo desconhecido ({scope}) em '{node.name}': {node.type_annotation}")
+
+            if not isinstance(evaluated_value, expected_type):
+                actual_type = self.infer_type(evaluated_value)
+                raise Exception(
+                    f"Erro de tipo ({scope}) em '{node.name}': esperado {node.type_annotation}, mas recebeu {actual_type}"
+                )
+            # Armazena o tipo no ambiente de tipos
+            self.type_env[var_name] = node.type_annotation
+
+        else:
+            # Inferir tipo automaticamente
+            inferred = self.infer_type(evaluated_value)
+            if inferred == "unknown":
+                raise Exception(f"Não foi possível inferir tipo ({scope}) para '{node.name}'")
+            self.type_env[var_name] = inferred
+
+        self.variables[var_name] = evaluated_value
+    
+    def infer_type(self, value):
+        return REVERSE_TYPE_MAP.get(type(value), "unknown")
+    
+    def evaluate_expression(self, node):
+        if isinstance(node, LiteralInt):
+            return node.value
+        elif isinstance(node, LiteralStr):
+            return node.value
+        elif isinstance(node, LiteralBool):
+            return node.value
+        elif isinstance(node, BinaryOp):
+            left = self.evaluate_expression(node.left)
+            right = self.evaluate_expression(node.right)
+            if node.op == "+":
+                return left + right
+            elif node.op == "-":
+                return left - right
+            elif node.op == "*":
+                return left * right
+            elif node.op == "/":
+                return left / right
+            elif node.op == "==":
+                return left == right
+            elif node.op == "!=":
+                return left != right
+            elif node.op == ">":
+                return left > right
+            elif node.op == "<":
+                return left < right
+            else:
+                raise Exception(f"Operação não suportada: {node.op}")
+        elif isinstance(node, VariableAccess):
+            var_name = self.format_variable(node.name)
+            if var_name not in self.variables:
+                raise Exception(f"Variável '{node.name}' não declarada.")
+            return self.variables[var_name]
+        elif isinstance(node, Identifier):
+            var_name = self.format_variable(node.name)
+            if var_name not in self.variables:
+                raise Exception(f"Variável '{node.name}' não declarada.")
+            return self.variables[var_name]
+        else:
+            raise Exception(f"Não sei avaliar: {node}")
 
 
     def visit_FunctionDef(self, node):
@@ -108,6 +202,9 @@ class ErlangCodegen:
 
     def visit_LiteralInt(self, node):
         return str(node.value)
+    
+    def visit_LiteralStr(self, node):
+        return f'"{node.value}"'
 
     def visit_Literal(self, node):
         if isinstance(node, LiteralBool):
@@ -118,11 +215,13 @@ class ErlangCodegen:
             return f'"{node.value[1:-1]}"'
         return str(node.value)
 
+    def visit_VariableAccess(self, node):
+        return self.format_variable(node.name)
+    
     def visit_Identifier(self, node):
         if node.name in RESERVED_WORDS:
             return RESERVED_WORDS[node.name]
         return self.format_variable(node.name)
-
 
     def visit_BinaryOp(self, node):
         left = self.visit(node.left)

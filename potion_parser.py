@@ -1,7 +1,7 @@
 # potion_parser.py
 
 import re
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 # --------------------
 # TOKENS DEFINITIONS
@@ -16,6 +16,7 @@ TOKEN_SPEC = [
     ("GT",         r">"),
     ("NUMBER",     r"\d+(\.\d+)?"),
     ("STRING",     r'\".*?\"'),
+    ("BOOL",       r'\btrue\b|\bfalse\b'),
     ("VAL",        r"val\b"),
     ("VAR",        r"var\b"),
     ("FN",         r"fn\b"),
@@ -79,9 +80,10 @@ class Program(ASTNode):
         self.statements = statements
 
 class ValDeclaration(ASTNode):
-    def __init__(self, name: str, value: ASTNode):
+    def __init__(self, name: str, value: ASTNode, type_annotation: Optional[str] = None):
         self.name = name
         self.value = value
+        self.type_annotation = type_annotation
 
 class VarDeclaration(ASTNode):
     def __init__(self, name: str, value: ASTNode):
@@ -110,7 +112,15 @@ class LiteralInt:
     def __init__(self, value):
         self.value = value
 
+class LiteralStr:
+    def __init__(self, value):
+        self.value = value
+
 class Identifier(ASTNode):
+    def __init__(self, name):
+        self.name = name
+
+class VariableAccess(ASTNode):
     def __init__(self, name):
         self.name = name
 
@@ -177,9 +187,15 @@ class Parser:
     def val_declaration(self) -> ValDeclaration:
         self.eat("VAL")
         name = self.eat("ID")[1]
+
+        type_ = None
+        if self.current()[0] == "COLON":
+            self.eat("COLON")
+            type_ = self.eat("ID")[1]
+
         self.eat("ASSIGN")
         expr = self.expression()
-        return ValDeclaration(name, expr)
+        return ValDeclaration(name, expr, type_)
 
     def var_declaration(self) -> VarDeclaration:
         self.eat("VAR")
@@ -270,24 +286,32 @@ class Parser:
         return node
 
     def factor(self) -> ASTNode:
-        tok = self.current()
-        if tok[0] == "STRING":
-            return Literal(self.eat("STRING")[1])
-        elif tok[0] == "NUMBER":
-            return LiteralInt(int(self.eat("NUMBER")[1]))  # Alterado para LiteralInt
-        elif tok[0] == "ID":
+        return self.primary()
+    
+    def primary(self) -> ASTNode:
+        tok_type, tok_value = self.current()
+
+        if tok_type == "NUMBER":
+            self.eat("NUMBER")
+            return LiteralInt(int(tok_value))
+
+        elif tok_type == "STRING":
+            self.eat("STRING")
+            return LiteralStr(tok_value.strip('"'))
+
+        elif tok_type == "BOOL":
+            self.eat("BOOL")
+            return LiteralBool(tok_value == "true")
+
+        elif tok_type == "ID":
             return Identifier(self.eat("ID")[1])
-        elif tok[0] == "TRUE":
-            self.eat("TRUE")
-            return LiteralBool(True)
-        elif tok[0] == "FALSE":
-            self.eat("FALSE")
-            return LiteralBool(False)
-        elif tok[0] == "LPAREN":
+
+        elif tok_type == "LPAREN":
             self.eat("LPAREN")
             node = self.expression()
             self.eat("RPAREN")
             return node
+
         else:
-            raise SyntaxError(f"Unexpected token in expression: {tok}")
+            raise SyntaxError(f"Unexpected token: {tok_type}")
 
