@@ -1,5 +1,5 @@
 import unittest
-from potion_parser import Parser, ValDeclaration, LiteralInt, tokenize
+from parser.potion_parser import Parser, ValDeclaration, LiteralInt, tokenize
 
 class TestParser(unittest.TestCase):
     def test_simple_val(self):

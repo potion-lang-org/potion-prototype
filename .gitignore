@@ -176,3 +176,7 @@ cython_debug/
 # Erlang files
 *.erl
 *.beam
+*.dump
+
+# potion file
+*.potion

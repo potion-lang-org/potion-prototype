@@ -1,4 +1,4 @@
-from potion_parser import *
+from parser.potion_parser import *
 
 RESERVED_WORDS = {
     "true": "true",

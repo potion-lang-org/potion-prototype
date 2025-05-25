@@ -1,8 +1,8 @@
 import unittest
 import subprocess
 import os
-from potion_parser import Parser, tokenize
-from potion_codegen import ErlangCodegen
+from parser.potion_parser import Parser, tokenize
+from codegen.potion_codegen import ErlangCodegen
 
 class TestIntegration(unittest.TestCase):
     def test_full_pipeline(self):
