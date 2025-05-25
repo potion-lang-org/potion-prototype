@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "potion-lang"
+version = "0.1.0"
+description = "A simple compiler for the Potion language that generates Erlang code."
+authors = [
+    { name="Seu Nome", email="seu@email.com" }
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+potionc = "cli.potionc:main"
+
+[tool.setuptools]
+packages = [
+    "cli",
+    "lexer",
+    "parser",
+    "codegen"
+]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests"
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"

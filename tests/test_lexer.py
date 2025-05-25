@@ -1,5 +1,5 @@
 import unittest
-from potion_parser import tokenize
+from parser.potion_parser import tokenize
 
 class TestLexer(unittest.TestCase):
     def test_val_declaration(self):
