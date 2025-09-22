@@ -28,6 +28,11 @@ class FunctionDef(ASTNode):
         self.params = params
         self.body = body
 
+class FunctionCall(ASTNode):
+    def __init__(self, name: str, args: List[ASTNode]):
+        self.name = name
+        self.args = args
+
 class PrintCall(ASTNode):
     def __init__(self, value: ASTNode):
         self.value = value
@@ -112,6 +117,9 @@ class Parser:
             return self.return_statement()
         elif tok[0] == "ID" and tok[1] == "print":
             return self.print_call()
+        elif tok[0] == "ID":
+            expr = self.expression()
+            return expr
         else:
             self.pos += 1  # Skip unrecognized token
             return None
@@ -236,7 +244,19 @@ class Parser:
             return LiteralBool(tok_value == "true")
 
         elif tok_type == "ID":
-            return Identifier(self.eat("ID")[1])
+            name = self.eat("ID")[1]
+            if self.current()[0] == "LPAREN":
+                self.eat("LPAREN")
+                args = []
+                if self.current()[0] != "RPAREN":
+                    args.append(self.expression())
+                    while self.current()[0] == "COMMA":
+                        self.eat("COMMA")
+                        args.append(self.expression())
+                self.eat("RPAREN")
+                return FunctionCall(name, args)
+            else:
+                return Identifier(name)
 
         elif tok_type == "LPAREN":
             self.eat("LPAREN")
@@ -246,4 +266,3 @@ class Parser:
 
         else:
             raise SyntaxError(f"Unexpected token: {tok_type}")
-
