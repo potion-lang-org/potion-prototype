@@ -18,6 +18,7 @@ TOKEN_SPEC = [
     ("VAL",        r"val\b"),
     ("VAR",        r"var\b"),
     ("FN",         r"fn\b"),
+    ("SP",         r"sp\b"),
     ("SEND",       r"send\b"),
     ("RECEIVE",    r"receive\b"),
     ("MATCH",      r"match\b"),

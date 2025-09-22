@@ -6,16 +6,26 @@ RESERVED_WORDS = {
     "none": "undefined",
 }
 
+class PidValue:
+    pass
+
+class DynamicValue:
+    pass
+
 TYPE_MAP = {
     "int": int,
     "str": str,
-    "bool": bool
+    "bool": bool,
+    "pid": PidValue,
+    "dynamic": DynamicValue
 }
 
 REVERSE_TYPE_MAP = {
     int: "int",
     str: "str",
-    bool: "bool"
+    bool: "bool",
+    PidValue: "pid",
+    DynamicValue: "dynamic"
 }
 
 class ErlangCodegen:
@@ -161,6 +171,9 @@ class ErlangCodegen:
             func_name = node.name
             args = [self.evaluate_expression(arg) for arg in node.args]
 
+            if func_name == "self":
+                return PidValue()
+
             if func_name not in self.functions:
                 raise Exception(f"Função '{func_name}' não definida.")
 
@@ -184,6 +197,22 @@ class ErlangCodegen:
             self.variables = old_variables
 
             return result
+
+        elif isinstance(node, SendExpression):
+            return DynamicValue()
+
+        elif isinstance(node, ReceiveBlock):
+            return DynamicValue()
+
+        elif isinstance(node, MatchExpression):
+            return DynamicValue()
+
+        elif isinstance(node, SpawnExpression):
+            # Retorna um placeholder de PID para fins de inferência
+            return PidValue()
+
+        elif isinstance(node, MapLiteral):
+            return DynamicValue()
 
         else:
             raise Exception(f"Não sei avaliar: {node}")
@@ -255,6 +284,128 @@ class ErlangCodegen:
         args_code = [self.visit(arg) for arg in node.args]
         return f"{node.name}({', '.join(args_code)})"
 
+    def visit_SendExpression(self, node: SendExpression):
+        target_code = self.visit(node.target)
+        message_code = self.visit(node.message)
+        return f"{target_code} ! {message_code}"
+
+    def visit_SpawnExpression(self, node: SpawnExpression):
+        call_code = self.visit(node.call)
+        return f"spawn(fun () -> {call_code} end)"
+
+    def visit_MapLiteral(self, node: MapLiteral):
+        if not node.entries:
+            return "#{}"
+        parts = []
+        for key, value in node.entries:
+            value_code = self.visit(value)
+            key_code = self.format_map_key(key)
+            parts.append(f"{key_code} => {value_code}")
+        inner = ", ".join(parts)
+        return f"#{{{inner}}}"
+
+    def visit_ReceiveBlock(self, node: ReceiveBlock):
+        binding_name = self.format_local_name(node.var_name)
+        prev_inside = self.inside_function
+        prev_locals = self.local_vars.copy()
+        self.inside_function = True
+        self.local_vars = prev_locals | {node.var_name}
+
+        body_lines = []
+        if node.body:
+            *stmts, last = node.body
+            for stmt in stmts:
+                code = self.visit(stmt)
+                if code:
+                    formatted = self.format_with_indent(code, "        ")
+                    body_lines.append(f"{formatted},")
+            last_code = self.visit(last) or 'ok'
+            formatted_last = self.format_with_indent(last_code, "        ")
+            body_lines.append(formatted_last)
+        else:
+            body_lines.append("        ok")
+
+        self.inside_function = prev_inside
+        self.local_vars = prev_locals
+
+        inner = "\n".join(body_lines)
+        return f"receive {binding_name} ->\n{inner}\n    end"
+
+    def visit_MatchExpression(self, node: MatchExpression):
+        value_code = self.visit(node.value)
+        clauses_code = []
+        for idx, clause in enumerate(node.clauses):
+            clause_code = self.generate_match_clause(clause)
+            if idx < len(node.clauses) - 1:
+                clause_code += ";"
+            clauses_code.append(clause_code)
+
+        clauses_block = "\n".join(clauses_code) if clauses_code else "    _ ->\n        ok"
+        return f"case {value_code} of\n{clauses_block}\nend"
+
+    def generate_match_clause(self, clause: MatchClause):
+        pattern_code = self.format_pattern(clause.pattern)
+        prev_locals = self.local_vars.copy()
+        bindings = self.collect_pattern_bindings(clause.pattern)
+        self.local_vars |= bindings
+
+        clause_lines = []
+        if clause.body:
+            *stmts, last = clause.body
+            for stmt in stmts:
+                code = self.visit(stmt)
+                if code:
+                    formatted = self.format_with_indent(code, "        ")
+                    clause_lines.append(f"{formatted},")
+            last_code = self.visit(last) or 'ok'
+            formatted_last = self.format_with_indent(last_code, "        ")
+            clause_lines.append(formatted_last)
+        else:
+            clause_lines.append("        ok")
+
+        self.local_vars = prev_locals
+
+        clause_body = "\n".join(clause_lines)
+        return f"    {pattern_code} ->\n{clause_body}"
+
+    def collect_pattern_bindings(self, pattern):
+        bindings = set()
+        if isinstance(pattern, Identifier):
+            if pattern.name != "_" and pattern.name not in self.global_var_names:
+                bindings.add(pattern.name)
+        elif isinstance(pattern, MapLiteral):
+            for _, value in pattern.entries:
+                bindings |= self.collect_pattern_bindings(value)
+        return bindings
+
+    def format_pattern(self, pattern):
+        if isinstance(pattern, Identifier):
+            if pattern.name == "_":
+                return "_"
+            if pattern.name in self.global_var_names:
+                return f"?{pattern.name.upper()}"
+            return self.format_local_name(pattern.name)
+        if isinstance(pattern, LiteralBool):
+            return self.visit_LiteralBool(pattern)
+        if isinstance(pattern, LiteralInt):
+            return self.visit_LiteralInt(pattern)
+        if isinstance(pattern, LiteralStr):
+            return self.visit_LiteralStr(pattern)
+        if isinstance(pattern, MapLiteral):
+            return self.format_pattern_map(pattern)
+        return self.visit(pattern)
+
+    def format_pattern_map(self, map_node: MapLiteral):
+        if not map_node.entries:
+            return "#{}"
+        parts = []
+        for key, value in map_node.entries:
+            key_code = self.format_map_key(key)
+            value_code = self.format_pattern(value)
+            parts.append(f"{key_code} := {value_code}")
+        inner = ", ".join(parts)
+        return f"#{{{inner}}}"
+
     def visit_PrintCall(self, node):
         expr = self.visit(node.value)
         return f'io:format("~p~n", [{expr}])'
@@ -286,6 +437,11 @@ class ErlangCodegen:
         return self.format_variable(node.name)
 
     def visit_BinaryOp(self, node):
+        if node.op == "+" and (self.is_string_expression(node.left) or self.is_string_expression(node.right)):
+            left = self.visit(node.left)
+            right = self.visit(node.right)
+            return f"({left} ++ {right})"
+
         left = self.visit(node.left)
         right = self.visit(node.right)
         op = self.map_operator(node.op)
@@ -339,3 +495,20 @@ class ErlangCodegen:
             return f"?{name.upper()}"
 
         return self.format_local_name(name)
+
+    def format_with_indent(self, code, indent="    "):
+        if not code:
+            return indent.rstrip()
+        return indent + code.replace("\n", f"\n{indent}")
+
+    def format_map_key(self, key: str) -> str:
+        if key and key[0].islower() and all(ch.isalnum() or ch == '_' for ch in key):
+            return key
+        return f"'{key}'"
+
+    def is_string_expression(self, node):
+        if isinstance(node, LiteralStr):
+            return True
+        if isinstance(node, BinaryOp) and node.op == "+":
+            return self.is_string_expression(node.left) or self.is_string_expression(node.right)
+        return False

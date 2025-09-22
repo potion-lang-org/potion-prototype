@@ -33,6 +33,34 @@ class FunctionCall(ASTNode):
         self.name = name
         self.args = args
 
+class MapLiteral(ASTNode):
+    def __init__(self, entries):
+        self.entries = entries  # List of (key, value)
+
+class SendExpression(ASTNode):
+    def __init__(self, target: ASTNode, message: ASTNode):
+        self.target = target
+        self.message = message
+
+class SpawnExpression(ASTNode):
+    def __init__(self, call: FunctionCall):
+        self.call = call
+
+class MatchClause(ASTNode):
+    def __init__(self, pattern: ASTNode, body: List[ASTNode]):
+        self.pattern = pattern
+        self.body = body
+
+class MatchExpression(ASTNode):
+    def __init__(self, value: ASTNode, clauses: List[MatchClause]):
+        self.value = value
+        self.clauses = clauses
+
+class ReceiveBlock(ASTNode):
+    def __init__(self, var_name: str, body: List[ASTNode]):
+        self.var_name = var_name
+        self.body = body
+
 class PrintCall(ASTNode):
     def __init__(self, value: ASTNode):
         self.value = value
@@ -117,6 +145,14 @@ class Parser:
             return self.return_statement()
         elif tok[0] == "ID" and tok[1] == "print":
             return self.print_call()
+        elif tok[0] == "SEND":
+            return self.send_expression()
+        elif tok[0] == "RECEIVE":
+            return self.receive_block()
+        elif tok[0] == "MATCH":
+            return self.match_expression()
+        elif tok[0] == "SP":
+            return self.spawn_expression()
         elif tok[0] == "ID":
             expr = self.expression()
             return expr
@@ -194,12 +230,79 @@ class Parser:
         return ReturnStatement(expr)
 
 
+    def send_expression(self) -> SendExpression:
+        self.eat("SEND")
+        self.eat("LPAREN")
+        target = self.expression()
+        self.eat("COMMA")
+        message = self.expression()
+        self.eat("RPAREN")
+        return SendExpression(target, message)
+
+
+    def spawn_expression(self) -> SpawnExpression:
+        self.eat("SP")
+        func_name = self.eat("ID")[1]
+        self.eat("LPAREN")
+        args = []
+        if self.current()[0] != "RPAREN":
+            args.append(self.expression())
+            while self.current()[0] == "COMMA":
+                self.eat("COMMA")
+                args.append(self.expression())
+        self.eat("RPAREN")
+        return SpawnExpression(FunctionCall(func_name, args))
+
+
     def print_call(self) -> PrintCall:
         self.eat("ID")  # 'print'
         self.eat("LPAREN")
         expr = self.expression()
         self.eat("RPAREN")
         return PrintCall(expr)
+
+
+    def receive_block(self) -> ReceiveBlock:
+        self.eat("RECEIVE")
+        var_name = self.eat("ID")[1]
+        self.eat("LBRACE")
+        body = []
+        while self.current()[0] != "RBRACE":
+            if self.current()[0] == "MATCH":
+                body.append(self.match_expression())
+            else:
+                stmt = self.statement()
+                if stmt:
+                    body.append(stmt)
+        self.eat("RBRACE")
+        return ReceiveBlock(var_name, body)
+
+
+    def match_expression(self) -> MatchExpression:
+        self.eat("MATCH")
+        value = self.expression()
+        self.eat("LBRACE")
+        clauses = []
+        while self.current()[0] != "RBRACE":
+            pattern = self.expression()
+            self.eat("ARROW")
+            clause_body = []
+            if self.current()[0] == "LBRACE":
+                self.eat("LBRACE")
+                while self.current()[0] != "RBRACE":
+                    stmt = self.statement()
+                    if stmt:
+                        clause_body.append(stmt)
+                self.eat("RBRACE")
+            else:
+                stmt = self.statement()
+                if stmt:
+                    clause_body.append(stmt)
+            clauses.append(MatchClause(pattern, clause_body))
+            if self.current()[0] == "COMMA":
+                self.eat("COMMA")
+        self.eat("RBRACE")
+        return MatchExpression(value, clauses)
 
     def expression(self) -> ASTNode:
         node = self.comparison()
@@ -257,6 +360,16 @@ class Parser:
                 return FunctionCall(name, args)
             else:
                 return Identifier(name)
+        elif tok_type == "SEND":
+            return self.send_expression()
+        elif tok_type == "RECEIVE":
+            return self.receive_block()
+        elif tok_type == "MATCH":
+            return self.match_expression()
+        elif tok_type == "SP":
+            return self.spawn_expression()
+        elif tok_type == "LBRACE":
+            return self.map_literal()
 
         elif tok_type == "LPAREN":
             self.eat("LPAREN")
@@ -266,3 +379,27 @@ class Parser:
 
         else:
             raise SyntaxError(f"Unexpected token: {tok_type}")
+
+    def map_literal(self) -> MapLiteral:
+        self.eat("LBRACE")
+        entries = []
+        if self.current()[0] == "RBRACE":
+            self.eat("RBRACE")
+            return MapLiteral(entries)
+
+        while True:
+            key_tok = self.current()
+            if key_tok[0] != "ID":
+                raise SyntaxError(f"Chave de mapa inválida: {key_tok}")
+            key = self.eat("ID")[1]
+            self.eat("COLON")
+            value = self.expression()
+            entries.append((key, value))
+
+            if self.current()[0] == "COMMA":
+                self.eat("COMMA")
+            else:
+                break
+
+        self.eat("RBRACE")
+        return MapLiteral(entries)
