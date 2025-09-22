@@ -32,6 +32,7 @@ class ErlangCodegen:
         self.functions = {}
         self.function_arities = {}
         self.function_params = {}
+        self.global_var_names = set()
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -55,6 +56,7 @@ class ErlangCodegen:
                     self.function_arities[stmt.name] = len(stmt.params)  
                     self.function_params[stmt.name] = stmt.params
                 elif isinstance(stmt, ValDeclaration):
+                    self.global_var_names.add(stmt.name)
                     value = self.visit(stmt.value)
                     self.global_vars.append((stmt.name, value))
 
@@ -78,6 +80,8 @@ class ErlangCodegen:
                 self.visit(stmt)
 
     def visit_ValDeclaration(self, node):
+        if self.inside_function:
+            self.local_vars.add(node.name)
         var_name = self.format_variable(node.name)
         value_code = self.visit(node.value)
 
@@ -196,6 +200,7 @@ class ErlangCodegen:
 
 
     def visit_FunctionDef(self, node):
+        # === ARMAZENA FUNÇÃO PARA POSSIVEIS USO POSTERIORES ===
         self.functions[node.name] = {
             "params": node.params,
             "body": node.body
@@ -203,46 +208,48 @@ class ErlangCodegen:
 
         self.lines.append("")
 
-        # Adiciona os parâmetros na declaração da função
-        params = [self.format_variable(p) for p in node.params]
-        param_str = ", ".join(params)
+        formatted_params = [self.format_local_name(p) for p in node.params]
+        param_str = ", ".join(formatted_params)
         self.lines.append(f"{node.name}({param_str}) ->")
 
-        # setup contexto
+        # === CONTROLE DE ESCOPO LOCAL ===
         prev_inside = self.inside_function
         prev_locals = self.local_vars
         self.inside_function = True
-        self.local_vars = set(params)
+        self.local_vars = set(node.params)
 
-        # gerar body
-        body_lines = []
-        for stmt in node.body:
-            if isinstance(stmt, ValDeclaration):
-                self.local_vars.add(stmt.name)
-            code = self.visit(stmt)
-            if code:
-                body_lines.append(code)
-
-        if not body_lines:
+        # === GERAÇÃO DO CORPO ===
+        # body_lines = []
+        # for stmt in node.body:
+        #     if isinstance(stmt, ValDeclaration):
+        #         self.local_vars.add(self.format_variable(stmt.name))
+        #     print(f"STMT: {stmt}")
+        #     code = self.visit(stmt)
+        #     print(f"CODE: {code}")
+        #     if code:
+        #         body_lines.append(code)
+        # print(f"BODY_LINE: {body_lines}")
+        
+        if not node.body:
             self.lines.append("    ok.")
         else:
             *stmts, last = node.body
-            for s in stmts:
-                code = self.visit(s)
+            for stmt in stmts:
+                code = self.visit(stmt)
                 if code:
                     self.lines.append(f"    {code},")
             
-            # Se o último é ReturnStatement, pega só o valor; senão, gera normalmente
             if isinstance(last, ReturnStatement):
                 ret_code = self.visit(last.value)
                 self.lines.append(f"    {ret_code}.")
             else:
                 last_code = self.visit(last)
-                self.lines.append(f"    {last_code}.")
+                self.lines.append(f"    {last_code or 'ok'}.")
 
-        # restaurar contexto só DEPOIS de tudo estar gerado
+        # === RESTAURA CONTEXTO ===
         self.inside_function = prev_inside
         self.local_vars = prev_locals
+
 
     def visit_FunctionCall(self, node: FunctionCall):
         args_code = [self.visit(arg) for arg in node.args]
@@ -317,9 +324,18 @@ class ErlangCodegen:
             "/": "div"
         }.get(op, op)
 
+    def format_local_name(self, name):
+        return name.capitalize()
+
     def format_variable(self, name):
-        if self.inside_function or self.function_params:
-            return name.capitalize()
-        return f"?{name.upper()}"
+        if self.inside_function:
+            if name in self.local_vars:
+                return self.format_local_name(name)
+            if name in self.global_var_names:
+                return f"?{name.upper()}"
+            return self.format_local_name(name)
 
+        if name in self.global_var_names:
+            return f"?{name.upper()}"
 
+        return self.format_local_name(name)

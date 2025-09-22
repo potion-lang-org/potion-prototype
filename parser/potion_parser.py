@@ -117,6 +117,9 @@ class Parser:
             return self.return_statement()
         elif tok[0] == "ID" and tok[1] == "print":
             return self.print_call()
+        elif tok[0] == "ID":
+            expr = self.expression()
+            return expr
         else:
             self.pos += 1  # Skip unrecognized token
             return None
@@ -263,4 +266,3 @@ class Parser:
 
         else:
             raise SyntaxError(f"Unexpected token: {tok_type}")
-
