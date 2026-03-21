@@ -1,5 +1,5 @@
 from typing import Union, Optional, List
-from lexer.potion_lexer import Token
+from lexer.potion_lexer import Token, tokenize
 
 # --------------------
 # AST NODE DEFINITIONS
@@ -65,27 +65,19 @@ class PrintCall(ASTNode):
     def __init__(self, value: ASTNode):
         self.value = value
 
-class Literal(ASTNode):
+class LiteralBool(ASTNode):
     def __init__(self, value):
         self.value = value
 
-class LiteralBool:
+class LiteralInt(ASTNode):
     def __init__(self, value):
         self.value = value
 
-class LiteralInt:
-    def __init__(self, value):
-        self.value = value
-
-class LiteralStr:
+class LiteralStr(ASTNode):
     def __init__(self, value):
         self.value = value
 
 class Identifier(ASTNode):
-    def __init__(self, name):
-        self.name = name
-
-class VariableAccess(ASTNode):
     def __init__(self, name):
         self.name = name
 
@@ -143,19 +135,8 @@ class Parser:
             return self.if_block()
         elif tok[0] == "RETURN":
             return self.return_statement()
-        elif tok[0] == "ID" and tok[1] == "print":
-            return self.print_call()
-        elif tok[0] == "SEND":
-            return self.send_expression()
-        elif tok[0] == "RECEIVE":
-            return self.receive_block()
-        elif tok[0] == "MATCH":
-            return self.match_expression()
-        elif tok[0] == "SP":
-            return self.spawn_expression()
-        elif tok[0] == "ID":
-            expr = self.expression()
-            return expr
+        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LPAREN", "NUMBER", "STRING", "BOOL"):
+            return self.expression()
         else:
             self.pos += 1  # Skip unrecognized token
             return None
@@ -254,14 +235,6 @@ class Parser:
         return SpawnExpression(FunctionCall(func_name, args))
 
 
-    def print_call(self) -> PrintCall:
-        self.eat("ID")  # 'print'
-        self.eat("LPAREN")
-        expr = self.expression()
-        self.eat("RPAREN")
-        return PrintCall(expr)
-
-
     def receive_block(self) -> ReceiveBlock:
         self.eat("RECEIVE")
         var_name = self.eat("ID")[1]
@@ -347,19 +320,7 @@ class Parser:
             return LiteralBool(tok_value == "true")
 
         elif tok_type == "ID":
-            name = self.eat("ID")[1]
-            if self.current()[0] == "LPAREN":
-                self.eat("LPAREN")
-                args = []
-                if self.current()[0] != "RPAREN":
-                    args.append(self.expression())
-                    while self.current()[0] == "COMMA":
-                        self.eat("COMMA")
-                        args.append(self.expression())
-                self.eat("RPAREN")
-                return FunctionCall(name, args)
-            else:
-                return Identifier(name)
+            return self.identifier_expression()
         elif tok_type == "SEND":
             return self.send_expression()
         elif tok_type == "RECEIVE":
@@ -379,6 +340,27 @@ class Parser:
 
         else:
             raise SyntaxError(f"Unexpected token: {tok_type}")
+
+    def identifier_expression(self) -> ASTNode:
+        name = self.eat("ID")[1]
+        if self.current()[0] != "LPAREN":
+            return Identifier(name)
+
+        self.eat("LPAREN")
+        args = []
+        if self.current()[0] != "RPAREN":
+            args.append(self.expression())
+            while self.current()[0] == "COMMA":
+                self.eat("COMMA")
+                args.append(self.expression())
+        self.eat("RPAREN")
+
+        if name == "print":
+            if len(args) != 1:
+                raise SyntaxError(f"print espera 1 argumento, recebeu {len(args)}")
+            return PrintCall(args[0])
+
+        return FunctionCall(name, args)
 
     def map_literal(self) -> MapLiteral:
         self.eat("LBRACE")

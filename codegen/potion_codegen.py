@@ -72,7 +72,7 @@ class ErlangCodegen:
 
                     self.type_checking(stmt, scope = "global")
 
-                    var_key = self.format_variable(stmt.name)
+                    var_key = self.emit_name(stmt.name)
                     real_val = self.evaluate_expression(stmt.value)
                     self.variables[var_key] = real_val
 
@@ -92,7 +92,7 @@ class ErlangCodegen:
     def visit_ValDeclaration(self, node):
         if self.inside_function:
             self.local_vars.add(node.name)
-        var_name = self.format_variable(node.name)
+        var_name = self.emit_name(node.name)
         value_code = self.visit(node.value)
 
         self.type_checking(node, scope = "local")
@@ -100,7 +100,7 @@ class ErlangCodegen:
         return f"{var_name} = {value_code}"
 
     def type_checking(self, node, scope = "local"):
-        var_name = self.format_variable(node.name)
+        var_name = self.emit_name(node.name)
         evaluated_value = self.evaluate_expression(node.value)
 
         # Verificação de tipo, se houver anotação
@@ -157,13 +157,8 @@ class ErlangCodegen:
                 return left < right
             else:
                 raise Exception(f"Operação não suportada: {node.op}")
-        elif isinstance(node, VariableAccess):
-            var_name = self.format_variable(node.name)
-            if var_name not in self.variables:
-                raise Exception(f"Variável '{node.name}' não declarada.")
-            return self.variables[var_name]
         elif isinstance(node, Identifier):
-            var_name = self.format_variable(node.name)
+            var_name = self.emit_name(node.name)
             if var_name not in self.variables:
                 raise Exception(f"Variável '{node.name}' não declarada.")
             return self.variables[var_name]
@@ -189,7 +184,7 @@ class ErlangCodegen:
             self.variables = {}
 
             for param_name, arg_value in zip(param_names, args):
-                self.variables[self.format_variable(param_name)] = arg_value
+                self.variables[self.emit_name(param_name)] = arg_value
 
             result = self.evaluate_block(body)
 
@@ -237,7 +232,7 @@ class ErlangCodegen:
 
         self.lines.append("")
 
-        formatted_params = [self.format_local_name(p) for p in node.params]
+        formatted_params = [self.emit_local_name(p) for p in node.params]
         param_str = ", ".join(formatted_params)
         self.lines.append(f"{node.name}({param_str}) ->")
 
@@ -251,7 +246,7 @@ class ErlangCodegen:
         # body_lines = []
         # for stmt in node.body:
         #     if isinstance(stmt, ValDeclaration):
-        #         self.local_vars.add(self.format_variable(stmt.name))
+        #         self.local_vars.add(self.emit_name(stmt.name))
         #     print(f"STMT: {stmt}")
         #     code = self.visit(stmt)
         #     print(f"CODE: {code}")
@@ -299,13 +294,13 @@ class ErlangCodegen:
         parts = []
         for key, value in node.entries:
             value_code = self.visit(value)
-            key_code = self.format_map_key(key)
+            key_code = self.emit_map_key(key)
             parts.append(f"{key_code} => {value_code}")
         inner = ", ".join(parts)
         return f"#{{{inner}}}"
 
     def visit_ReceiveBlock(self, node: ReceiveBlock):
-        binding_name = self.format_local_name(node.var_name)
+        binding_name = self.emit_local_name(node.var_name)
         prev_inside = self.inside_function
         prev_locals = self.local_vars.copy()
         self.inside_function = True
@@ -344,7 +339,7 @@ class ErlangCodegen:
         return f"case {value_code} of\n{clauses_block}\nend"
 
     def generate_match_clause(self, clause: MatchClause):
-        pattern_code = self.format_pattern(clause.pattern)
+        pattern_code = self.emit_pattern(clause.pattern)
         prev_locals = self.local_vars.copy()
         bindings = self.collect_pattern_bindings(clause.pattern)
         self.local_vars |= bindings
@@ -378,13 +373,13 @@ class ErlangCodegen:
                 bindings |= self.collect_pattern_bindings(value)
         return bindings
 
-    def format_pattern(self, pattern):
+    def emit_pattern(self, pattern):
         if isinstance(pattern, Identifier):
             if pattern.name == "_":
                 return "_"
             if pattern.name in self.global_var_names:
                 return f"?{pattern.name.upper()}"
-            return self.format_local_name(pattern.name)
+            return self.emit_local_name(pattern.name)
         if isinstance(pattern, LiteralBool):
             return self.visit_LiteralBool(pattern)
         if isinstance(pattern, LiteralInt):
@@ -392,16 +387,16 @@ class ErlangCodegen:
         if isinstance(pattern, LiteralStr):
             return self.visit_LiteralStr(pattern)
         if isinstance(pattern, MapLiteral):
-            return self.format_pattern_map(pattern)
+            return self.emit_pattern_map(pattern)
         return self.visit(pattern)
 
-    def format_pattern_map(self, map_node: MapLiteral):
+    def emit_pattern_map(self, map_node: MapLiteral):
         if not map_node.entries:
             return "#{}"
         parts = []
         for key, value in map_node.entries:
-            key_code = self.format_map_key(key)
-            value_code = self.format_pattern(value)
+            key_code = self.emit_map_key(key)
+            value_code = self.emit_pattern(value)
             parts.append(f"{key_code} := {value_code}")
         inner = ", ".join(parts)
         return f"#{{{inner}}}"
@@ -419,22 +414,10 @@ class ErlangCodegen:
     def visit_LiteralStr(self, node):
         return f'"{node.value}"'
 
-    def visit_Literal(self, node):
-        if isinstance(node, LiteralBool):
-            return self.visit_LiteralBool(node)
-        if isinstance(node, LiteralInt):
-            return self.visit_LiteralInt(node)
-        if isinstance(node.value, str) and node.value.startswith('"'):
-            return f'"{node.value[1:-1]}"'
-        return str(node.value)
-
-    def visit_VariableAccess(self, node):
-        return self.format_variable(node.name)
-    
     def visit_Identifier(self, node):
         if node.name in RESERVED_WORDS:
             return RESERVED_WORDS[node.name]
-        return self.format_variable(node.name)
+        return self.emit_name(node.name)
 
     def visit_BinaryOp(self, node):
         if node.op == "+" and (self.is_string_expression(node.left) or self.is_string_expression(node.right)):
@@ -480,28 +463,28 @@ class ErlangCodegen:
             "/": "div"
         }.get(op, op)
 
-    def format_local_name(self, name):
+    def emit_local_name(self, name):
         return name.capitalize()
 
-    def format_variable(self, name):
+    def emit_name(self, name):
         if self.inside_function:
             if name in self.local_vars:
-                return self.format_local_name(name)
+                return self.emit_local_name(name)
             if name in self.global_var_names:
                 return f"?{name.upper()}"
-            return self.format_local_name(name)
+            return self.emit_local_name(name)
 
         if name in self.global_var_names:
             return f"?{name.upper()}"
 
-        return self.format_local_name(name)
+        return self.emit_local_name(name)
 
     def format_with_indent(self, code, indent="    "):
         if not code:
             return indent.rstrip()
         return indent + code.replace("\n", f"\n{indent}")
 
-    def format_map_key(self, key: str) -> str:
+    def emit_map_key(self, key: str) -> str:
         if key and key[0].islower() and all(ch.isalnum() or ch == '_' for ch in key):
             return key
         return f"'{key}'"

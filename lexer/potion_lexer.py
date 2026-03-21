@@ -35,16 +35,12 @@ TOKEN_SPEC = [
     ("PLUS",       r"\+"),
     ("MINUS",      r"-"),
     ("STAR",       r"\*"),
+    ("COMMENT",    r"//[^\n]*"),
     ("SLASH",      r"/"),
     ("COMMA",      r","),
     ("ID",         r"[a-zA-Z_][a-zA-Z0-9_]*"),
-    ('WHITESPACE', r'\s+'),
-    ("NEWLINE",    r"\n"),
-    ("SKIP",       r"[ \t]+"),
+    ("WHITESPACE", r"\s+"),
     ("MISMATCH",   r"."),
-    ('COMMENT', r'//[^\n]*'),
-    
-
 ]
 
 token_re = re.compile("|".join(f"(?P<{name}>{pattern})" for name, pattern in TOKEN_SPEC))
@@ -60,7 +56,7 @@ def tokenize(code: str) -> List[Token]:
     for match in token_re.finditer(code):
         kind = match.lastgroup
         value = match.group()
-        if kind in ('WHITESPACE', 'NEWLINE', 'COMMENT', 'SKIP'):
+        if kind in ("WHITESPACE", "COMMENT"):
             continue
         elif kind == "MISMATCH":
             raise RuntimeError(f"Unexpected character: {value}")
