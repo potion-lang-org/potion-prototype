@@ -1,0 +1,16 @@
+var current: none = none
+val fallback: str = "anonymous"
+
+fn describe(name) {
+    if name == none {
+        print("Missing name")
+    } else {
+        print("Name: " + name)
+    }
+}
+
+fn main() {
+    var resolved: none = current
+    describe(resolved)
+    print(fallback)
+}

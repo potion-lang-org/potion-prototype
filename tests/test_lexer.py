@@ -11,3 +11,10 @@ class TestLexer(unittest.TestCase):
         self.assertEqual(tokens[3][0], "ID")
         self.assertEqual(tokens[4][0], "ASSIGN")
         self.assertEqual(tokens[5][0], "NUMBER")
+
+    def test_var_and_none_tokens(self):
+        tokens = tokenize("var maybe = none")
+        self.assertEqual(tokens[0][0], "VAR")
+        self.assertEqual(tokens[1][0], "ID")
+        self.assertEqual(tokens[2][0], "ASSIGN")
+        self.assertEqual(tokens[3][0], "NONE")

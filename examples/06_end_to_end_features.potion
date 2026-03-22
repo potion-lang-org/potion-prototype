@@ -1,0 +1,47 @@
+val tax: int = 5
+var maybe_name: none = none
+
+fn make_user(total) {
+    val approved: bool = total >= 10
+
+    if approved {
+        return {name: "Potion User", total: total + tax}
+    } else {
+        return {name: "Guest", total: total}
+    }
+}
+
+fn worker() {
+    receive payload {
+        match payload {
+            {customer: customer, reply_to: caller} => {
+                print("Processing customer")
+                send(caller, {result: customer})
+            }
+            _ => send(self(), {result: {name: "invalid", total: 0}})
+        }
+    }
+}
+
+fn main() {
+    val customer = make_user(12)
+    val pid: pid = sp worker()
+
+    if maybe_name == none {
+        print("No explicit name configured")
+    } else {
+        print("Configured name found")
+    }
+
+    send(pid, {customer: customer, reply_to: self()})
+
+    receive response {
+        match response {
+            {result: data} => match data {
+                {name: who, total: total} => print("Done")
+                _ => print("Bad payload")
+            }
+            _ => print("No response")
+        }
+    }
+}

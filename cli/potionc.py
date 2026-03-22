@@ -4,6 +4,16 @@ import sys
 import os
 import subprocess
 import argparse
+import re
+
+
+def sanitize_module_name(source_name: str) -> str:
+    module_name = re.sub(r"[^a-zA-Z0-9_]", "_", source_name).lower()
+    if not module_name:
+        return "potion_module"
+    if not module_name[0].isalpha():
+        module_name = f"potion_{module_name}"
+    return module_name
 
 
 def main():
@@ -29,7 +39,8 @@ def main():
         sys.exit(1)
 
     filename = os.path.basename(abs_path)
-    module_name = os.path.splitext(filename)[0]
+    source_module_name = os.path.splitext(filename)[0]
+    module_name = sanitize_module_name(source_module_name)
 
     try:
         ast = parse_potion_file(abs_path)
@@ -51,6 +62,8 @@ def main():
             f.write(erlang_code)
 
         print(f"\n✅ Erlang file generated: {output_path}")
+        if module_name != source_module_name:
+            print(f"ℹ️ Sanitized Erlang module name: {module_name}")
 
         if not args.no_beam:
             # Compilar com erlc

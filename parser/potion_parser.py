@@ -18,9 +18,10 @@ class ValDeclaration(ASTNode):
         self.type_annotation = type_annotation
 
 class VarDeclaration(ASTNode):
-    def __init__(self, name: str, value: ASTNode):
+    def __init__(self, name: str, value: ASTNode, type_annotation: Optional[str] = None):
         self.name = name
         self.value = value
+        self.type_annotation = type_annotation
 
 class FunctionDef(ASTNode):
     def __init__(self, name: str, params: List[str], body: List[ASTNode]):
@@ -76,6 +77,9 @@ class LiteralInt(ASTNode):
 class LiteralStr(ASTNode):
     def __init__(self, value):
         self.value = value
+
+class LiteralNone(ASTNode):
+    pass
 
 class Identifier(ASTNode):
     def __init__(self, name):
@@ -135,7 +139,7 @@ class Parser:
             return self.if_block()
         elif tok[0] == "RETURN":
             return self.return_statement()
-        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LPAREN", "NUMBER", "STRING", "BOOL"):
+        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE"):
             return self.expression()
         else:
             self.pos += 1  # Skip unrecognized token
@@ -148,7 +152,7 @@ class Parser:
         type_ = None
         if self.current()[0] == "COLON":
             self.eat("COLON")
-            type_ = self.eat("ID")[1]
+            type_ = self.type_name()
 
         self.eat("ASSIGN")
         expr = self.expression()
@@ -157,9 +161,15 @@ class Parser:
     def var_declaration(self) -> VarDeclaration:
         self.eat("VAR")
         name = self.eat("ID")[1]
+
+        type_ = None
+        if self.current()[0] == "COLON":
+            self.eat("COLON")
+            type_ = self.type_name()
+
         self.eat("ASSIGN")
         expr = self.expression()
-        return VarDeclaration(name, expr)
+        return VarDeclaration(name, expr, type_)
 
     def function_def(self) -> FunctionDef:
         self.eat("FN")
@@ -318,6 +328,9 @@ class Parser:
         elif tok_type == "BOOL":
             self.eat("BOOL")
             return LiteralBool(tok_value == "true")
+        elif tok_type == "NONE":
+            self.eat("NONE")
+            return LiteralNone()
 
         elif tok_type == "ID":
             return self.identifier_expression()
@@ -361,6 +374,13 @@ class Parser:
             return PrintCall(args[0])
 
         return FunctionCall(name, args)
+
+    def type_name(self) -> str:
+        tok_type, tok_value = self.current()
+        if tok_type in ("ID", "NONE"):
+            self.pos += 1
+            return tok_value
+        raise SyntaxError(f"Tipo inválido: {self.current()}")
 
     def map_literal(self) -> MapLiteral:
         self.eat("LBRACE")

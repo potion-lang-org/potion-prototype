@@ -3,6 +3,7 @@
 > 🇺🇸 [English Version](./README.md)  
 > 🤝 [Contributing (EN)](./.github/CONTRIBUTING.en.md) • [Contribuindo (PT-BR)](./.github/CONTRIBUTING.pt-br.md)  
 > 📜 [Code of Conduct (EN)](./.github/CODE_OF_CONDUCT.en.md) • [Código de Conduta (PT-BR)](./.github/CODE_OF_CONDUCT.pt-br.md)
+> 📘 [Language Spec (EN)](./docs/language-spec.md) • [Especificação da Linguagem (PT-BR)](./docs/language-spec.pt-br.md)
 
 ## 📖 Visão Geral
 
@@ -14,7 +15,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 ## ✨ Objetivos
 
 - Sintaxe moderna e enxuta (inspirada em Python/Rust) direcionada ao ecossistema Erlang/OTP.
-- Suporte atual a variáveis imutáveis (`val`) e plano futuro para variáveis mutáveis (`var`).
+- Suporte a declarações com `val` e `var`, atualmente compiladas como bindings/macros Erlang.
 - Anotações de tipos opcionais com inferência básica.
 - Primitivas de concorrência de primeira classe (`sp`, `send`, `receive`, `match`).
 - Pattern matching ergonômico com literais de mapa que viram maps Erlang.
@@ -26,14 +27,20 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 ## ✅ Funcionalidades Atuais
 
 - Declarações `val` com anotações de tipo opcionais (`val total: int = 42`).
+- Declarações `var` com anotações de tipo opcionais (`var current: none = none`).
 - Funções com parâmetros, variáveis locais e `return` explícito.
+- Literais para inteiros, strings, booleanos, mapas e `none`.
 - Operadores aritméticos (`+`, `-`, `*`, `/`) e comparações (`==`, `!=`, `<`, `>`, `<=`, `>=`).
 - Concatenação de strings com `+`, emitida como `++` em Erlang.
 - Condicionais `if` / `else` traduzidas para `case` Erlang.
 - Literais de mapa e pattern matching aninhado via blocos `match`.
 - Construtores de concorrência: `sp` para spawn, `send` para envio de mensagens e `receive` para espera.
+- Suporte embutido a `self()` para obter o pid atual do processo Erlang.
+- Builtin `to_string(...)` para converter valores em string antes de concatenar.
 - `print(...)` embutido mapeado para `io:format`.
+- Checagem/inferência básica de tipos para `int`, `str`, `bool`, `none`, `pid` e `dynamic`.
 - CLI (`potionc`) para transpilar `.potion`, compilar e opcionalmente executar.
+- Exemplos `.potion` em [`examples/`](./examples/).
 
 ---
 
@@ -43,15 +50,18 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 ```potion
 val taxa = 5
 val mensagem = "Olá"
+var talvez_nome: none = none
 ```
 
 → Traduzido para macros Erlang:
 ```erlang
 -define(TAXA, 5).
 -define(MENSAGEM, "Olá").
+-define(TALVEZ_NOME, undefined).
 ```
 
 > ℹ️ Nomes globais viram `?MACROS`; variáveis locais recebem estilo Capitalizado (`Valor`).
+> `var` hoje funciona como forma de declaração, mas ainda não possui sintaxe de reatribuição.
 
 ### Funções
 ```potion
@@ -67,6 +77,15 @@ calcular() ->
     Proximo = (?TAXA + 3),
     (Proximo * 2).
 ```
+
+### Tipos e `none`
+```potion
+var atual: none = none
+val pronto: bool = true
+val meu_pid: pid = self()
+```
+
+→ `none` é emitido como `undefined` em Erlang.
 
 ### Condicionais
 ```potion
@@ -166,9 +185,38 @@ main() ->
 ### Impressão e strings
 ```potion
 print("Total: " + resultado)
+print("Age: " + to_string(idade))
 ```
 
 → `io:format("~p~n", ["Total: " ++ Resultado])`
+
+Para a lista completa de palavras-chave reservadas, builtins, tipos e regras de sintaxe, veja [`docs/language-spec.pt-br.md`](./docs/language-spec.pt-br.md).
+
+### Resumo da Sintaxe Atual
+
+```potion
+val total: int = 10
+var fallback: none = none
+
+fn main() {
+    val aprovado: bool = total >= 5
+
+    if aprovado {
+        print("ok")
+    } else {
+        print("not ok")
+    }
+}
+```
+
+Tipos suportados hoje:
+
+- `int`
+- `str`
+- `bool`
+- `none`
+- `pid`
+- `dynamic`
 
 ---
 
@@ -177,13 +225,24 @@ print("Total: " + resultado)
 O `potionc` é o ponto de entrada em Python localizado em `cli/potionc.py`.
 
 **Requisitos**
-- Python 3.10+
+- Python 3.8+
 - Erlang/OTP (`erlc` e `erl` configurados no PATH)
+
+**Instalação**
+```bash
+# fluxo de desenvolvimento: mantém o comando apontando para o checkout local
+pip install -e .
+
+# instalação comum
+pip install .
+```
+
+Após `pip install -e .`, mudanças no compilador passam a ser usadas pelo comando `potionc` instalado sem reinstalar a cada edição.
 
 **Uso**
 ```bash
 python -m cli.potionc caminho/para/arquivo.potion [opções]
-# após instalar com `pip install .`, basta executar:
+# após instalar com `pip install -e .` ou `pip install .`, basta executar:
 potionc caminho/para/arquivo.potion [opções]
 ```
 
@@ -203,6 +262,9 @@ python -m cli.potionc send_message.potion --no-beam
 
 # Compila para outro diretório e roda main/0
 python -m cli.potionc send_message.potion --outdir build --run
+
+# instala a CLI em modo editável para desenvolvimento
+pip install -e .
 ```
 
 ---
@@ -219,14 +281,27 @@ python -m cli.potionc send_message.potion --outdir build --run
 ## ⚡ Roadmap
 
 - [x] Tipagem opcional em declarações `val`.
+- [x] Tipagem opcional em declarações `var`.
+- [x] Suporte ao literal `none`.
 - [x] Literais de mapa com pattern matching básico.
 - [x] Primitivas de concorrência (`sp`, `send`, `receive`, `match`).
 - [x] CLI oficial para transpilar/compilar/executar.
-- [ ] Variáveis mutáveis (`var`).
+- [ ] Sintaxe de reatribuição / atualização mutável para `var`.
 - [ ] Listas, tuplas e coleções adicionais.
 - [ ] Sistema de módulos e imports.
 - [ ] Analisador semântico e checagens estáticas.
 - [ ] Geração direta de BEAM (sem Erlang intermediário).
+
+---
+
+## 📐 Limites Atuais
+
+- Literais numéricos são tratados como inteiros no parser e no codegen.
+- Parâmetros de função ainda não possuem anotação de tipo.
+- `print(...)` atualmente aceita um único argumento.
+- Chaves de mapa precisam ser identificadores simples e são emitidas como átomos Erlang.
+- `var` suporta declaração, mas não reatribuição com sintaxe como `x = y`.
+- A checagem de tipos ainda é propositalmente leve e acoplada à geração de código.
 
 ---
 

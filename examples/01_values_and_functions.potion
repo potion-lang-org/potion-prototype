@@ -1,0 +1,13 @@
+val base: int = 10
+val label: str = "Total"
+
+fn double(value) {
+    val result: int = value * 2
+    return result
+}
+
+fn main() {
+    val computed: int = double(base)
+    print(label)
+    print(computed)
+}

@@ -1,0 +1,23 @@
+fn worker() {
+    receive message {
+        match message {
+            {hello: name, reply_to: caller} => {
+                print("Hello, " + name)
+                send(caller, {ok: "received"})
+            }
+            _ => print("unexpected message")
+        }
+    }
+}
+
+fn main() {
+    val proc_id: pid = sp worker()
+    send(proc_id, {hello: "Bruce", reply_to: self()})
+
+    receive response {
+        match response {
+            {ok: text} => print(text)
+            _ => print("no response")
+        }
+    }
+}
