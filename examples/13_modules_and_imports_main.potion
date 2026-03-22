@@ -1,0 +1,6 @@
+import module_helpers
+
+fn main() {
+    greet("Bruce")
+    announce("Bruce", 42)
+}

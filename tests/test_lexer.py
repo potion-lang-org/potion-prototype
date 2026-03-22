@@ -18,3 +18,8 @@ class TestLexer(unittest.TestCase):
         self.assertEqual(tokens[1][0], "ID")
         self.assertEqual(tokens[2][0], "ASSIGN")
         self.assertEqual(tokens[3][0], "NONE")
+
+    def test_import_token(self):
+        tokens = tokenize("import helpers")
+        self.assertEqual(tokens[0], ("IMPORT", "import"))
+        self.assertEqual(tokens[1], ("ID", "helpers"))

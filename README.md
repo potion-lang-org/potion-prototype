@@ -32,6 +32,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 - `var` declarations with optional type hints (`var current: none = none`).
 - Function parameters with optional type hints (`fn greet(name: str, age: int) { ... }`).
 - Local reassignment for `var` with syntax like `current = next_value`.
+- Module imports between `.potion` files with `import module_name`.
 - Functions with parameters, local bindings, and explicit `return`.
 - Literals for integers, strings, booleans, maps, and `none`.
 - Arithmetic (`+`, `-`, `*`, `/`) and comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`).
@@ -79,6 +80,18 @@ calculate(Delta) ->
     Next = (?RATE + Delta),
     (Next * 2).
 ```
+
+### Modules and imports
+```potion
+import module_helpers
+
+fn main() {
+    greet("Bruce")
+}
+```
+
+Potion resolves `import module_helpers` to `module_helpers.potion` in the same directory as the importing file.
+Imported function calls are written without qualification in Potion and emitted as remote Erlang calls internally.
 
 ### Types and `none`
 ```potion
@@ -317,8 +330,8 @@ pip install -e .
 - [x] Official CLI for transpile/compile/run.
 - [x] Reassignment / mutable update syntax for local `var`.
 - [x] Optional typing on function parameters.
+- [x] Basic module imports across `.potion` files in the same directory.
 - [ ] Lists, tuples, and richer collection literals.
-- [ ] Module system and imports.
 - [x] Semantic analyser and static checks.
 - [ ] Direct BEAM generation (skip intermediate Erlang).
 
@@ -331,6 +344,7 @@ pip install -e .
 - Map keys must be bare identifiers and are emitted as Erlang atoms.
 - `var` is intended for function-local mutable state, not module-level mutable state.
 - Type checking is intentionally lightweight and still incomplete compared to a full standalone type system.
+- Imports currently resolve only to sibling `.potion` files and expose imported functions, not imported global values.
 
 ---
 

@@ -25,6 +25,7 @@ The lexer currently reserves these keywords:
 - `return`
 - `val`
 - `var`
+- `import`
 - `fn`
 - `sp`
 - `send`
@@ -151,6 +152,31 @@ fn greet(name: str, suffix) {
     return name + suffix
 }
 ```
+
+## Modules and Imports
+
+Potion uses one source file per module.
+
+Import syntax:
+
+```potion
+import module_helpers
+```
+
+Current rules:
+
+- `import module_name` resolves to `module_name.potion`
+- imported modules are searched in the same directory as the importing file
+- imported functions can be called directly by name in Potion source
+- imported calls are emitted as remote Erlang calls such as `module_helpers:greet(...)`
+- local functions take precedence over imported functions with the same name and arity
+
+Current limitations:
+
+- only imported functions are exposed to the importing module
+- imported top-level `val` bindings are not exposed
+- there is no alias syntax and no selective import syntax
+- nested directory module paths are not implemented
 
 ## Expressions
 
@@ -401,6 +427,7 @@ Example:
 - module-level mutable state is not part of the language
 - parameter type annotations are optional, but return type annotations are not implemented
 - there is no module/import system
+- imports are limited to sibling `.potion` files and imported functions
 - there are no lists or tuples in Potion syntax yet
 - type checking is lightweight and still tied to code generation
 - string concatenation depends on the compiler recognizing the expression as string-producing

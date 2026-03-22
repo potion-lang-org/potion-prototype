@@ -25,6 +25,7 @@ O lexer reserva atualmente estas palavras-chave:
 - `return`
 - `val`
 - `var`
+- `import`
 - `fn`
 - `sp`
 - `send`
@@ -151,6 +152,31 @@ fn greet(name: str, suffix) {
     return name + suffix
 }
 ```
+
+## Módulos e Imports
+
+Potion usa um arquivo-fonte por módulo.
+
+Sintaxe de import:
+
+```potion
+import module_helpers
+```
+
+Regras atuais:
+
+- `import nome_do_modulo` resolve para `nome_do_modulo.potion`
+- módulos importados são buscados no mesmo diretório do arquivo importador
+- funções importadas podem ser chamadas diretamente pelo nome no código Potion
+- chamadas importadas são emitidas como chamadas remotas Erlang, como `module_helpers:greet(...)`
+- funções locais têm precedência sobre funções importadas com o mesmo nome e aridade
+
+Limites atuais:
+
+- apenas funções importadas são expostas ao módulo importador
+- bindings `val` no topo do módulo importado não são expostos
+- não há sintaxe de alias nem de import seletivo
+- caminhos de módulo em diretórios aninhados ainda não existem
 
 ## Expressões
 
@@ -400,7 +426,7 @@ Exemplo:
 
 - estado mutável no nível de módulo não faz parte da linguagem
 - anotações de tipo em parâmetros são opcionais, mas anotações de tipo de retorno ainda não existem
-- não há sistema de módulos/imports
+- imports são limitados a arquivos `.potion` irmãos e funções importadas
 - ainda não existem listas nem tuplas na sintaxe Potion
 - a checagem de tipos é leve e ainda está acoplada à geração de código
 - concatenação de strings depende de o compilador reconhecer a expressão como produtora de string

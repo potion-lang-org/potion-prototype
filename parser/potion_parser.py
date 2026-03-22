@@ -23,6 +23,10 @@ class VarDeclaration(ASTNode):
         self.value = value
         self.type_annotation = type_annotation
 
+class ImportStatement(ASTNode):
+    def __init__(self, module_name: str):
+        self.module_name = module_name
+
 class Assignment(ASTNode):
     def __init__(self, name: str, value: ASTNode):
         self.name = name
@@ -147,6 +151,8 @@ class Parser:
             return self.val_declaration()
         elif tok[0] == "VAR":
             return self.var_declaration()
+        elif tok[0] == "IMPORT":
+            return self.import_statement()
         elif tok[0] == "FN":
             return self.function_def()
         elif tok[0] == "IF":
@@ -186,6 +192,11 @@ class Parser:
         self.eat("ASSIGN")
         expr = self.expression()
         return VarDeclaration(name, expr, type_)
+
+    def import_statement(self) -> ImportStatement:
+        self.eat("IMPORT")
+        module_name = self.eat("ID")[1]
+        return ImportStatement(module_name)
 
     def function_def(self) -> FunctionDef:
         self.eat("FN")
