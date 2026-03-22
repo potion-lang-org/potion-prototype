@@ -15,7 +15,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 ## ✨ Objetivos
 
 - Sintaxe moderna e enxuta (inspirada em Python/Rust) direcionada ao ecossistema Erlang/OTP.
-- Suporte a declarações com `val` e `var`, atualmente compiladas como bindings/macros Erlang.
+- Suporte a declarações com `val` e a bindings mutáveis locais com `var`.
 - Anotações de tipos opcionais com inferência básica.
 - Primitivas de concorrência de primeira classe (`sp`, `send`, `receive`, `match`).
 - Pattern matching ergonômico com literais de mapa que viram maps Erlang.
@@ -51,19 +51,16 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 ```potion
 val taxa = 5
 val mensagem = "Olá"
-var talvez_nome: none = none
 ```
 
 → Traduzido para macros Erlang:
 ```erlang
 -define(TAXA, 5).
 -define(MENSAGEM, "Olá").
--define(TALVEZ_NOME, undefined).
 ```
 
 > ℹ️ Nomes globais viram `?MACROS`; variáveis locais recebem estilo Capitalizado (`Valor`).
-> `var` suporta reatribuição local dentro de funções.
-> `var` global continua sendo emitido como macro e não é reatribuível.
+> Potion usa `val` para bindings de módulo e `var` para estado mutável local dentro de funções.
 
 ### Funções
 ```potion
@@ -82,7 +79,7 @@ calcular() ->
 
 ### Tipos e `none`
 ```potion
-var atual: none = none
+val atual: none = none
 val pronto: bool = true
 val meu_pid: pid = self()
 ```
@@ -315,7 +312,7 @@ pip install -e .
 - Parâmetros de função ainda não possuem anotação de tipo.
 - `print(...)` atualmente aceita um único argumento.
 - Chaves de mapa precisam ser identificadores simples e são emitidas como átomos Erlang.
-- `var` global ainda não é reatribuível.
+- `var` é voltado para estado mutável local de função, não para estado mutável no nível de módulo.
 - A checagem de tipos ainda é propositalmente leve e acoplada à geração de código.
 
 ---
