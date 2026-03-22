@@ -1,0 +1,13 @@
+fn describe(name: str, age: int) {
+    match {name: name, age: age} {
+        {name: who, age: years} => {
+            print("Name: " + who)
+            print("Age: " + to_string(years))
+        }
+        _ => print("Unknown")
+    }
+}
+
+fn main() {
+    describe("Bruce", 42)
+}

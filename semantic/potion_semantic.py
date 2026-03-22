@@ -2,6 +2,7 @@ from parser.potion_parser import (
     Assignment,
     BinaryOp,
     FunctionCall,
+    FunctionParam,
     Identifier,
     IfBlock,
     LiteralBool,
@@ -26,6 +27,11 @@ class PidValue:
 
 class DynamicValue:
     pass
+
+
+class TypedValue:
+    def __init__(self, type_name):
+        self.type_name = type_name
 
 
 UNKNOWN = DynamicValue()
@@ -116,7 +122,73 @@ class SemanticAnalyzer:
         self.variables[var_name] = evaluated_value
 
     def infer_type(self, value):
+        if isinstance(value, TypedValue):
+            return value.type_name
         return REVERSE_TYPE_MAP.get(type(value), "unknown")
+
+    def placeholder_value_for_type(self, type_name):
+        if type_name == "int":
+            return 0
+        if type_name == "str":
+            return ""
+        if type_name == "bool":
+            return False
+        if type_name == "none":
+            return None
+        if type_name == "pid":
+            return PidValue()
+        if type_name == "dynamic":
+            return UNKNOWN
+        return TypedValue(type_name)
+
+    def param_names(self, params):
+        return [param.name for param in params]
+
+    def validate_function_param_annotations(self, params):
+        for param in params:
+            if not param.type_annotation:
+                continue
+            if param.type_annotation not in TYPE_MAP:
+                raise Exception(
+                    f"Tipo desconhecido em parâmetro '{param.name}': {param.type_annotation}"
+                )
+
+    def bind_function_params(self, params, arg_values=None):
+        for idx, param in enumerate(params):
+            emitted_name = self.emit_local_name(param.name)
+            if arg_values is not None:
+                value = arg_values[idx]
+            elif param.type_annotation:
+                value = self.placeholder_value_for_type(param.type_annotation)
+            else:
+                value = UNKNOWN
+
+            if param.type_annotation:
+                self.type_env[emitted_name] = param.type_annotation
+            elif value is not UNKNOWN:
+                inferred = self.infer_type(value)
+                if inferred != "unknown":
+                    self.type_env[emitted_name] = inferred
+
+            self.variables[emitted_name] = value
+
+    def validate_function_call_args(self, func_name, params, args):
+        if len(args) != len(params):
+            raise Exception(
+                f"Função '{func_name}' espera {len(params)} argumento(s), recebeu {len(args)}."
+            )
+
+        for param, arg_value in zip(params, args):
+            if not param.type_annotation or arg_value is UNKNOWN:
+                continue
+            actual_type = self.infer_type(arg_value)
+            if actual_type == "unknown":
+                continue
+            if actual_type != param.type_annotation:
+                raise Exception(
+                    f"Erro de tipo em chamada de função '{func_name}': parâmetro '{param.name}' "
+                    f"espera {param.type_annotation}, mas recebeu {actual_type}"
+                )
 
     def evaluate_expression(self, node):
         if isinstance(node, LiteralInt):
@@ -191,22 +263,20 @@ class SemanticAnalyzer:
                 raise Exception(f"Função '{func_name}' não definida.")
 
             func_def = self.functions[func_name]
-            param_names = func_def["params"]
+            params = func_def["params"]
             body = func_def["body"]
-
-            if len(args) != len(param_names):
-                raise Exception(
-                    f"Função '{func_name}' espera {len(param_names)} argumento(s), recebeu {len(args)}."
-                )
+            self.validate_function_param_annotations(params)
+            self.validate_function_call_args(func_name, params, args)
 
             old_variables = self.variables.copy()
+            old_type_env = self.type_env.copy()
             self.variables = {}
-
-            for param_name, arg_value in zip(param_names, args):
-                self.variables[self.emit_name(param_name)] = arg_value
+            self.type_env = {}
+            self.bind_function_params(params, args)
 
             result = self.evaluate_block(body)
             self.variables = old_variables
+            self.type_env = old_type_env
             return result
 
         if isinstance(node, (SendExpression, ReceiveBlock, MatchExpression, MapLiteral)):

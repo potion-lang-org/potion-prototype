@@ -59,6 +59,20 @@ class TestCodegen(unittest.TestCase):
         self.assertIn('potion_to_string_builtin(Age)', erlang_code)
         self.assertIn('potion_to_string_builtin(Value) when is_integer(Value) ->', erlang_code)
 
+    def test_typed_function_params_codegen(self):
+        code = """
+        fn greet(name: str, age: int) {
+            val message = name + "!"
+            print(message)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("greet(Name, Age) ->", erlang_code)
+        self.assertIn('Message = (Name ++ "!")', erlang_code)
+
     def test_var_reassignment_codegen(self):
         code = """
         fn main() {

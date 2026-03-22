@@ -28,6 +28,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 
 - Declarações `val` com anotações de tipo opcionais (`val total: int = 42`).
 - Declarações `var` com anotações de tipo opcionais (`var current: none = none`).
+- Parâmetros de função com anotações de tipo opcionais (`fn greet(name: str, age: int) { ... }`).
 - Reatribuição local de `var` com sintaxe como `current = next_value`.
 - Funções com parâmetros, variáveis locais e `return` explícito.
 - Literais para inteiros, strings, booleanos, mapas e `none`.
@@ -64,16 +65,16 @@ val mensagem = "Olá"
 
 ### Funções
 ```potion
-fn calcular() {
-    val proximo = taxa + 3
+fn calcular(delta: int) {
+    val proximo = taxa + delta
     return proximo * 2
 }
 ```
 
 → Erlang:
 ```erlang
-calcular() ->
-    Proximo = (?TAXA + 3),
+calcular(Delta) ->
+    Proximo = (?TAXA + Delta),
     (Proximo * 2).
 ```
 
@@ -195,11 +196,11 @@ main() ->
 
 ### Impressão e strings
 ```potion
-print("Total: " + resultado)
+print("Total: " + to_string(resultado))
 print("Age: " + to_string(idade))
 ```
 
-→ `io:format("~p~n", ["Total: " ++ Resultado])`
+→ `io:format("~p~n", ["Total: " ++ potion_to_string_builtin(Resultado)])`
 
 Potion não faz coerção implícita em expressões mistas com `+`.
 Isto falha em tempo de compilação:
@@ -313,9 +314,10 @@ pip install -e .
 - [x] Primitivas de concorrência (`sp`, `send`, `receive`, `match`).
 - [x] CLI oficial para transpilar/compilar/executar.
 - [x] Sintaxe de reatribuição / atualização mutável para `var` local.
+- [x] Tipagem opcional em parâmetros de função.
 - [ ] Listas, tuplas e coleções adicionais.
 - [ ] Sistema de módulos e imports.
-- [ ] Analisador semântico e checagens estáticas.
+- [x] Analisador semântico e checagens estáticas.
 - [ ] Geração direta de BEAM (sem Erlang intermediário).
 
 ---
@@ -323,11 +325,10 @@ pip install -e .
 ## 📐 Limites Atuais
 
 - Literais numéricos são tratados como inteiros no parser e no codegen.
-- Parâmetros de função ainda não possuem anotação de tipo.
 - `print(...)` atualmente aceita um único argumento.
 - Chaves de mapa precisam ser identificadores simples e são emitidas como átomos Erlang.
 - `var` é voltado para estado mutável local de função, não para estado mutável no nível de módulo.
-- A checagem de tipos ainda é propositalmente leve e acoplada à geração de código.
+- A checagem de tipos ainda é propositalmente leve e incompleta em comparação com um sistema de tipos completo.
 
 ---
 
@@ -353,7 +354,7 @@ fn main() {
 
     receive resposta {
         match resposta {
-            {result: total} => print("Resultado: " + total)
+            {result: total} => print("Resultado: " + to_string(total))
         }
     }
 }
