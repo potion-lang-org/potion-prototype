@@ -31,3 +31,21 @@ class TestSemanticAnalyzer(unittest.TestCase):
             analyzer.evaluate_expression(ast.statements[0])
         self.assertIn("operador '+' recebeu tipos incompatíveis", str(ctx.exception))
         self.assertIn("Use to_string(...)", str(ctx.exception))
+
+    def test_function_call_rejects_wrong_typed_argument(self):
+        code = """
+        fn greet(name: str) {
+            return name
+        }
+
+        greet(1)
+        """
+        ast = Parser(tokenize(code)).parse()
+        analyzer = SemanticAnalyzer()
+        analyzer.functions["greet"] = {
+            "params": ast.statements[0].params,
+            "body": ast.statements[0].body,
+        }
+        with self.assertRaises(Exception) as ctx:
+            analyzer.evaluate_expression(ast.statements[1])
+        self.assertIn("Erro de tipo em chamada de função 'greet'", str(ctx.exception))

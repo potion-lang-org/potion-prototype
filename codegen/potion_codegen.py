@@ -40,6 +40,7 @@ class ErlangCodegen(SemanticAnalyzer):
                     self.function_names.append(stmt.name)
                     self.function_arities[stmt.name] = len(stmt.params)  
                     self.function_params[stmt.name] = stmt.params
+                    self.validate_function_param_annotations(stmt.params)
                     self.functions[stmt.name] = {
                         "params": stmt.params,
                         "body": stmt.body,
@@ -127,7 +128,7 @@ class ErlangCodegen(SemanticAnalyzer):
 
         self.lines.append("")
 
-        formatted_params = [self.emit_local_name(p) for p in node.params]
+        formatted_params = [self.emit_local_name(p.name) for p in node.params]
         param_str = ", ".join(formatted_params)
         self.lines.append(f"{node.name}({param_str}) ->")
 
@@ -136,10 +137,15 @@ class ErlangCodegen(SemanticAnalyzer):
         prev_locals = self.local_vars
         prev_mutable = self.mutable_vars.copy()
         prev_versions = self.var_versions.copy()
+        prev_variables = self.variables.copy()
+        prev_type_env = self.type_env.copy()
         self.inside_function = True
-        self.local_vars = set(node.params)
+        self.local_vars = {param.name for param in node.params}
         self.mutable_vars = set()
         self.var_versions = {}
+        self.variables = prev_variables.copy()
+        self.type_env = prev_type_env.copy()
+        self.bind_function_params(node.params)
 
         # === GERAÇÃO DO CORPO ===
         # body_lines = []
@@ -174,6 +180,8 @@ class ErlangCodegen(SemanticAnalyzer):
         self.local_vars = prev_locals
         self.mutable_vars = prev_mutable
         self.var_versions = prev_versions
+        self.variables = prev_variables
+        self.type_env = prev_type_env
 
 
     def visit_FunctionCall(self, node: FunctionCall):
@@ -183,6 +191,12 @@ class ErlangCodegen(SemanticAnalyzer):
             self.uses_to_string_builtin = True
             arg_code = self.visit(node.args[0])
             return f"potion_to_string_builtin({arg_code})"
+
+        if node.name in self.functions:
+            args_values = [self.evaluate_expression(arg) for arg in node.args]
+            params = self.functions[node.name]["params"]
+            self.validate_function_param_annotations(params)
+            self.validate_function_call_args(node.name, params, args_values)
 
         args_code = [self.visit(arg) for arg in node.args]
         return f"{node.name}({', '.join(args_code)})"

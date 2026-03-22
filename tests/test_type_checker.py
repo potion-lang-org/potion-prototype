@@ -74,6 +74,36 @@ class TestTypeChecker(unittest.TestCase):
         erlang_code = codegen.generate()
         self.assertIn('Message = ("Age: " ++ potion_to_string_builtin(42))', erlang_code)
 
+    def test_typed_function_param_rejects_invalid_call(self):
+        code = """
+        fn greet(name: str) {
+            print(name)
+        }
+
+        fn main() {
+            greet(1)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("Erro de tipo em chamada de função 'greet'", str(ctx.exception))
+
+    def test_typed_function_param_supports_local_inference(self):
+        code = """
+        fn greet(name: str) {
+            val message = name + "!"
+            print(message)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn('Message = (Name ++ "!")', erlang_code)
+
     def test_reassignment_requires_var(self):
         code = """
         fn main() {

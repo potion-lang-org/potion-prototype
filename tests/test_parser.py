@@ -1,5 +1,14 @@
 import unittest
-from parser.potion_parser import Parser, ValDeclaration, VarDeclaration, Assignment, LiteralInt, LiteralNone, tokenize
+from parser.potion_parser import (
+    Assignment,
+    FunctionDef,
+    LiteralInt,
+    LiteralNone,
+    Parser,
+    ValDeclaration,
+    VarDeclaration,
+    tokenize,
+)
 
 class TestParser(unittest.TestCase):
     def test_simple_val(self):
@@ -31,3 +40,17 @@ class TestParser(unittest.TestCase):
         ast = parser.parse()
         self.assertIsInstance(ast.statements[0].body[1], Assignment)
         self.assertEqual(ast.statements[0].body[1].name, "total")
+
+    def test_function_param_type_annotation(self):
+        tokens = tokenize("""
+        fn greet(name: str, age: int) {
+            return name
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[0], FunctionDef)
+        self.assertEqual(ast.statements[0].params[0].name, "name")
+        self.assertEqual(ast.statements[0].params[0].type_annotation, "str")
+        self.assertEqual(ast.statements[0].params[1].name, "age")
+        self.assertEqual(ast.statements[0].params[1].type_annotation, "int")

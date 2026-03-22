@@ -30,6 +30,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 
 - `val` declarations with optional type hints (`val total: int = 42`).
 - `var` declarations with optional type hints (`var current: none = none`).
+- Function parameters with optional type hints (`fn greet(name: str, age: int) { ... }`).
 - Local reassignment for `var` with syntax like `current = next_value`.
 - Functions with parameters, local bindings, and explicit `return`.
 - Literals for integers, strings, booleans, maps, and `none`.
@@ -66,16 +67,16 @@ val message = "Hello"
 
 ### Functions
 ```potion
-fn calculate() {
-    val next = rate + 3
+fn calculate(delta: int) {
+    val next = rate + delta
     return next * 2
 }
 ```
 
 → Erlang:
 ```erlang
-calculate() ->
-    Next = (?RATE + 3),
+calculate(Delta) ->
+    Next = (?RATE + Delta),
     (Next * 2).
 ```
 
@@ -197,11 +198,11 @@ main() ->
 
 ### Printing & strings
 ```potion
-print("Total: " + result)
+print("Total: " + to_string(result))
 print("Age: " + to_string(age))
 ```
 
-→ `io:format("~p~n", ["Total: " ++ Result])`
+→ `io:format("~p~n", ["Total: " ++ potion_to_string_builtin(Result)])`
 
 Potion does not perform implicit coercion for mixed `+` expressions.
 This is rejected at compile time:
@@ -315,9 +316,10 @@ pip install -e .
 - [x] Concurrency primitives (`sp`, `send`, `receive`, `match`).
 - [x] Official CLI for transpile/compile/run.
 - [x] Reassignment / mutable update syntax for local `var`.
+- [x] Optional typing on function parameters.
 - [ ] Lists, tuples, and richer collection literals.
 - [ ] Module system and imports.
-- [ ] Semantic analyser and static checks.
+- [x] Semantic analyser and static checks.
 - [ ] Direct BEAM generation (skip intermediate Erlang).
 
 ---
@@ -325,11 +327,10 @@ pip install -e .
 ## 📐 Current Limits
 
 - Numeric literals are currently treated as integers in the parser and codegen.
-- Function parameters do not have type annotations yet.
 - `print(...)` currently expects a single argument.
 - Map keys must be bare identifiers and are emitted as Erlang atoms.
 - `var` is intended for function-local mutable state, not module-level mutable state.
-- Type checking is intentionally lightweight and still tied to code generation.
+- Type checking is intentionally lightweight and still incomplete compared to a full standalone type system.
 
 ---
 
@@ -355,7 +356,7 @@ fn main() {
 
     receive response {
         match response {
-            {result: total} => print("Result: " + total)
+            {result: total} => print("Result: " + to_string(total))
         }
     }
 }

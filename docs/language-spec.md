@@ -132,7 +132,7 @@ For mutable local `var`, the compiler internally emits versioned Erlang variable
 Function declaration syntax:
 
 ```potion
-fn sum(a, b) {
+fn sum(a: int, b: int) {
     return a + b
 }
 ```
@@ -140,9 +140,17 @@ fn sum(a, b) {
 Current rules:
 
 - parameters are positional
-- parameters do not have type annotations yet
+- parameter type annotations are optional
 - explicit `return` is supported
 - if the last statement is not a `return`, the last emitted Erlang expression becomes the function result
+
+Example with mixed annotated and unannotated parameters:
+
+```potion
+fn greet(name: str, suffix) {
+    return name + suffix
+}
+```
 
 ## Expressions
 
@@ -391,7 +399,7 @@ Example:
 ## Current Limitations
 
 - module-level mutable state is not part of the language
-- parameter type annotations are not implemented
+- parameter type annotations are optional, but return type annotations are not implemented
 - there is no module/import system
 - there are no lists or tuples in Potion syntax yet
 - type checking is lightweight and still tied to code generation

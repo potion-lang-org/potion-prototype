@@ -132,7 +132,7 @@ Para `var` local mutável, o compilador emite internamente variáveis Erlang ver
 Sintaxe de declaração:
 
 ```potion
-fn sum(a, b) {
+fn sum(a: int, b: int) {
     return a + b
 }
 ```
@@ -140,9 +140,17 @@ fn sum(a, b) {
 Regras atuais:
 
 - parâmetros são posicionais
-- parâmetros ainda não têm anotação de tipo
+- anotações de tipo em parâmetros são opcionais
 - `return` explícito é suportado
 - se a última instrução não for `return`, a última expressão Erlang emitida vira o resultado da função
+
+Exemplo com parâmetros anotados e não anotados:
+
+```potion
+fn greet(name: str, suffix) {
+    return name + suffix
+}
+```
 
 ## Expressões
 
@@ -391,7 +399,7 @@ Exemplo:
 ## Limites Atuais
 
 - estado mutável no nível de módulo não faz parte da linguagem
-- anotações de tipo em parâmetros não existem
+- anotações de tipo em parâmetros são opcionais, mas anotações de tipo de retorno ainda não existem
 - não há sistema de módulos/imports
 - ainda não existem listas nem tuplas na sintaxe Potion
 - a checagem de tipos é leve e ainda está acoplada à geração de código

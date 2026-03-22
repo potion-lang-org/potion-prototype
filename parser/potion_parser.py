@@ -28,8 +28,13 @@ class Assignment(ASTNode):
         self.name = name
         self.value = value
 
+class FunctionParam(ASTNode):
+    def __init__(self, name: str, type_annotation: Optional[str] = None):
+        self.name = name
+        self.type_annotation = type_annotation
+
 class FunctionDef(ASTNode):
-    def __init__(self, name: str, params: List[str], body: List[ASTNode]):
+    def __init__(self, name: str, params: List[FunctionParam], body: List[ASTNode]):
         self.name = name
         self.params = params
         self.body = body
@@ -188,10 +193,10 @@ class Parser:
         self.eat("LPAREN")
         params = []
         if self.current()[0] != "RPAREN":
-            params.append(self.eat("ID")[1])
+            params.append(self.function_param())
             while self.current()[0] == "COMMA":
                 self.eat("COMMA")
-                params.append(self.eat("ID")[1])
+                params.append(self.function_param())
         self.eat("RPAREN")
         self.eat("LBRACE")
         body = []
@@ -201,6 +206,14 @@ class Parser:
                 body.append(stmt)
         self.eat("RBRACE")
         return FunctionDef(name, params, body)
+
+    def function_param(self) -> FunctionParam:
+        name = self.eat("ID")[1]
+        type_ = None
+        if self.current()[0] == "COLON":
+            self.eat("COLON")
+            type_ = self.type_name()
+        return FunctionParam(name, type_)
 
     def if_block(self) -> IfBlock:
         self.eat("IF")
