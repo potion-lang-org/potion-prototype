@@ -177,6 +177,3 @@ cython_debug/
 *.erl
 *.beam
 *.dump
-
-# potion file
-*.potion
