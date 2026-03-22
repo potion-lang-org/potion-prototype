@@ -20,7 +20,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 - Primitivas de concorrência de primeira classe (`sp`, `send`, `receive`, `match`).
 - Pattern matching ergonômico com literais de mapa que viram maps Erlang.
 - Código Erlang gerado de forma idiomática (macros para globais, finais explícitos, uso de `ok`).
-- Evolução para estruturas de dados mais ricas, módulos e uma fase de análise semântica.
+- Evolução para estruturas de dados mais ricas e módulos, em cima da fase atual de análise semântica.
 
 ---
 
@@ -39,7 +39,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 - Suporte embutido a `self()` para obter o pid atual do processo Erlang.
 - Builtin `to_string(...)` para converter valores em string antes de concatenar.
 - `print(...)` embutido mapeado para `io:format`.
-- Checagem/inferência básica de tipos para `int`, `str`, `bool`, `none`, `pid` e `dynamic`.
+- Análise semântica dedicada com checagem/inferência de tipos para `int`, `str`, `bool`, `none`, `pid` e `dynamic`.
 - CLI (`potionc`) para transpilar `.potion`, compilar e opcionalmente executar.
 - Exemplos `.potion` em [`examples/`](./examples/).
 
@@ -200,6 +200,20 @@ print("Age: " + to_string(idade))
 ```
 
 → `io:format("~p~n", ["Total: " ++ Resultado])`
+
+Potion não faz coerção implícita em expressões mistas com `+`.
+Isto falha em tempo de compilação:
+
+```potion
+val idade: int = 42
+val mensagem = "Age: " + idade
+```
+
+Use `to_string(...)` explicitamente quando quiser concatenação textual:
+
+```potion
+val mensagem = "Age: " + to_string(idade)
+```
 
 Para a lista completa de palavras-chave reservadas, builtins, tipos e regras de sintaxe, veja [`docs/language-spec.pt-br.md`](./docs/language-spec.pt-br.md).
 

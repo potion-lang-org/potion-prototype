@@ -22,7 +22,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 - First-class concurrency primitives (`sp`, `send`, `receive`, `match`).
 - Ergonomic pattern matching and map literals that translate to Erlang maps.
 - Generated Erlang that follows idiomatic practices (macros for globals, explicit returns, `ok` fallbacks).
-- Extensibility for richer data structures, modules, and a full semantic analysis phase.
+- Extensibility for richer data structures and modules, on top of the current semantic analysis phase.
 
 ---
 
@@ -41,7 +41,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 - Built-in `self()` support for obtaining the current Erlang process id.
 - Built-in `to_string(...)` for stringifying values before concatenation.
 - Built-in `print(...)` that maps to `io:format`.
-- Basic type checking and inference for `int`, `str`, `bool`, `none`, `pid`, and `dynamic`.
+- Dedicated semantic analysis with type checking and inference for `int`, `str`, `bool`, `none`, `pid`, and `dynamic`.
 - CLI tool (`potionc`) that transpiles `.potion` files to `.erl` and optionally compiles/runs them.
 - Example `.potion` programs under [`examples/`](./examples/).
 
@@ -202,6 +202,20 @@ print("Age: " + to_string(age))
 ```
 
 → `io:format("~p~n", ["Total: " ++ Result])`
+
+Potion does not perform implicit coercion for mixed `+` expressions.
+This is rejected at compile time:
+
+```potion
+val age: int = 42
+val message = "Age: " + age
+```
+
+Use `to_string(...)` explicitly when you want textual concatenation:
+
+```potion
+val message = "Age: " + to_string(age)
+```
 
 For a full list of reserved keywords, builtins, types, and syntax rules, see [`docs/language-spec.md`](./docs/language-spec.md).
 
