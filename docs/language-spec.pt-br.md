@@ -277,6 +277,31 @@ send(pid, {ok: "done"})
 
 Compila para o operador `!` de Erlang.
 
+`send` apenas envia um valor para um processo de destino. Ele não cria um canal automático de resposta.
+
+Se o emissor espera uma resposta, o padrão comum é incluir o próprio pid dentro da mensagem:
+
+```potion
+send(worker_pid, {hello: "Bruce", reply_to: self()})
+```
+
+O receptor então pode fazer binding desse pid em um pattern de mapa e responder explicitamente:
+
+```potion
+match message {
+    {hello: name, reply_to: caller} => {
+        send(caller, {ok: "received"})
+    }
+}
+```
+
+Observações:
+
+- `self()` retorna o pid do processo atual
+- `reply_to` não é palavra reservada; é apenas uma chave de mapa por convenção
+- `caller` não é palavra reservada; é apenas o nome local usado no pattern
+- isso é uma convenção de protocolo de mensagens construída sobre `send`, não uma feature especial de resposta da linguagem
+
 ### `receive`
 
 ```potion
