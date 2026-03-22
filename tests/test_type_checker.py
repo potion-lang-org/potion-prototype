@@ -46,6 +46,34 @@ class TestTypeChecker(unittest.TestCase):
         erlang_code = codegen.generate()
         self.assertIn('Rendered = potion_to_string_builtin(Age)', erlang_code)
 
+    def test_mixed_string_and_int_addition_raises(self):
+        code = """
+        fn main() {
+            val message = "Age: " + 42
+            print(message)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("operador '+' recebeu tipos incompatíveis", str(ctx.exception))
+        self.assertIn("Use to_string(...)", str(ctx.exception))
+
+    def test_explicit_to_string_allows_textual_concat(self):
+        code = """
+        fn main() {
+            val message = "Age: " + to_string(42)
+            print(message)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn('Message = ("Age: " ++ potion_to_string_builtin(42))', erlang_code)
+
     def test_reassignment_requires_var(self):
         code = """
         fn main() {

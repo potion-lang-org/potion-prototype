@@ -16,6 +16,7 @@ Current implementation focus:
 - maps and pattern matching
 - message passing and process spawning
 - lightweight type annotations and inference
+- semantic analysis before Erlang code generation
 
 ## Reserved Keywords
 
@@ -180,7 +181,10 @@ Comparison operators:
 Notes:
 
 - `/` is emitted as Erlang integer division `div`
-- string concatenation uses `+` in Potion and becomes `++` in Erlang when the compiler recognizes a string expression
+- `+` accepts `int + int` and `str + str`
+- mixed `+` expressions such as `str + int` and `int + str` are rejected at compile time
+- use `to_string(...)` explicitly when you need textual concatenation with a non-string value
+- string concatenation becomes `++` in Erlang after semantic validation confirms both sides are strings
 
 ## Builtins
 
@@ -222,6 +226,35 @@ Current conversion behavior:
 - atoms: `atom_to_list/1`
 - binaries: `binary_to_list/1`
 - fallback: `io_lib:format("~p", ...)` flattened to a list
+
+## Semantic Analysis
+
+Before Erlang code generation, Potion runs a semantic analysis phase.
+
+Current responsibilities:
+
+- record declared names and function arities
+- track local mutable `var` bindings
+- infer simple value types when possible
+- validate explicit type annotations
+- reject invalid reassignment
+- reject incompatible `+` operations such as `str + int`
+
+Potion favors explicit conversion over implicit coercion.
+
+For example, this is invalid:
+
+```potion
+val age: int = 42
+val message = "Age: " + age
+```
+
+This is valid:
+
+```potion
+val age: int = 42
+val message = "Age: " + to_string(age)
+```
 
 ## Control Flow
 

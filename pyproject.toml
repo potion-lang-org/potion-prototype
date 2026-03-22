@@ -22,7 +22,8 @@ packages = [
     "cli",
     "lexer",
     "parser",
-    "codegen"
+    "codegen",
+    "semantic"
 ]
 
 [tool.setuptools.package-dir]

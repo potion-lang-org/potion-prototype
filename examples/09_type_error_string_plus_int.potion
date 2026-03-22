@@ -1,0 +1,5 @@
+fn main() {
+    val age: int = 42
+    val message = "Age: " + age
+    print(message)
+}

@@ -16,6 +16,7 @@ Foco atual da implementação:
 - mapas e pattern matching
 - troca de mensagens e criação de processos
 - anotações e inferência leve de tipos
+- análise semântica antes da geração de Erlang
 
 ## Palavras-chave Reservadas
 
@@ -180,7 +181,10 @@ Operadores de comparação:
 Observações:
 
 - `/` é emitido como divisão inteira `div` em Erlang
-- concatenação de string usa `+` em Potion e vira `++` em Erlang quando o compilador reconhece uma expressão de string
+- `+` aceita `int + int` e `str + str`
+- expressões mistas com `+`, como `str + int` e `int + str`, falham em tempo de compilação
+- use `to_string(...)` explicitamente quando precisar de concatenação textual com um valor que não é string
+- concatenação de string vira `++` em Erlang depois que a análise semântica confirma que os dois lados são strings
 
 ## Builtins
 
@@ -222,6 +226,35 @@ Comportamento atual da conversão:
 - átomos: `atom_to_list/1`
 - binários: `binary_to_list/1`
 - fallback: `io_lib:format("~p", ...)` achatado para lista
+
+## Análise Semântica
+
+Antes da geração de código Erlang, Potion executa uma fase de análise semântica.
+
+Responsabilidades atuais:
+
+- registrar nomes declarados e aridades de funções
+- acompanhar bindings mutáveis locais com `var`
+- inferir tipos simples quando possível
+- validar anotações explícitas de tipo
+- rejeitar reatribuições inválidas
+- rejeitar operações incompatíveis com `+`, como `str + int`
+
+Potion favorece conversão explícita em vez de coerção implícita.
+
+Por exemplo, isto é inválido:
+
+```potion
+val idade: int = 42
+val mensagem = "Age: " + idade
+```
+
+Isto é válido:
+
+```potion
+val idade: int = 42
+val mensagem = "Age: " + to_string(idade)
+```
 
 ## Controle de Fluxo
 
