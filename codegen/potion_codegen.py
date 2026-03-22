@@ -8,7 +8,7 @@ RESERVED_WORDS = {
 }
 
 class ErlangCodegen(SemanticAnalyzer):
-    def __init__(self, ast, module_name="module_name"):
+    def __init__(self, ast, module_name="module_name", external_functions=None):
         super().__init__()
         self.ast = ast
         self.lines = []
@@ -16,6 +16,7 @@ class ErlangCodegen(SemanticAnalyzer):
         self.function_names = []
         self.global_vars = []
         self.uses_to_string_builtin = False
+        self.external_functions = external_functions or {}
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -66,7 +67,7 @@ class ErlangCodegen(SemanticAnalyzer):
 
     def visit_Program(self, node):
         for stmt in node.statements:
-            if not isinstance(stmt, (ValDeclaration, VarDeclaration)):  # Globais já tratadas
+            if not isinstance(stmt, (ImportStatement, ValDeclaration, VarDeclaration)):  # Globais já tratadas
                 self.visit(stmt)
 
     def visit_ValDeclaration(self, node):
@@ -197,9 +198,21 @@ class ErlangCodegen(SemanticAnalyzer):
             params = self.functions[node.name]["params"]
             self.validate_function_param_annotations(params)
             self.validate_function_call_args(node.name, params, args_values)
+        else:
+            external = self.external_functions.get((node.name, len(node.args)))
+            if external is not None:
+                args_values = [self.evaluate_expression(arg) for arg in node.args]
+                params = external["params"]
+                self.validate_function_param_annotations(params)
+                self.validate_function_call_args(node.name, params, args_values)
+                args_code = [self.visit(arg) for arg in node.args]
+                return f"{external['module_name']}:{node.name}({', '.join(args_code)})"
 
         args_code = [self.visit(arg) for arg in node.args]
         return f"{node.name}({', '.join(args_code)})"
+
+    def visit_ImportStatement(self, node):
+        return None
 
     def visit_SendExpression(self, node: SendExpression):
         target_code = self.visit(node.target)

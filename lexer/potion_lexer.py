@@ -17,6 +17,7 @@ TOKEN_SPEC = [
     ("BOOL",       r'\btrue\b|\bfalse\b'),
     ("VAL",        r"val\b"),
     ("VAR",        r"var\b"),
+    ("IMPORT",     r"import\b"),
     ("FN",         r"fn\b"),
     ("SP",         r"sp\b"),
     ("SEND",       r"send\b"),

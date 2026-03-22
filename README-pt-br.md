@@ -30,6 +30,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 - Declarações `var` com anotações de tipo opcionais (`var current: none = none`).
 - Parâmetros de função com anotações de tipo opcionais (`fn greet(name: str, age: int) { ... }`).
 - Reatribuição local de `var` com sintaxe como `current = next_value`.
+- Imports de módulos entre arquivos `.potion` com `import nome_do_modulo`.
 - Funções com parâmetros, variáveis locais e `return` explícito.
 - Literais para inteiros, strings, booleanos, mapas e `none`.
 - Operadores aritméticos (`+`, `-`, `*`, `/`) e comparações (`==`, `!=`, `<`, `>`, `<=`, `>=`).
@@ -77,6 +78,18 @@ calcular(Delta) ->
     Proximo = (?TAXA + Delta),
     (Proximo * 2).
 ```
+
+### Módulos e imports
+```potion
+import module_helpers
+
+fn main() {
+    greet("Bruce")
+}
+```
+
+Potion resolve `import module_helpers` para `module_helpers.potion` no mesmo diretório do arquivo importador.
+Chamadas de funções importadas são escritas sem qualificação em Potion e emitidas internamente como chamadas remotas em Erlang.
 
 ### Tipos e `none`
 ```potion
@@ -315,8 +328,8 @@ pip install -e .
 - [x] CLI oficial para transpilar/compilar/executar.
 - [x] Sintaxe de reatribuição / atualização mutável para `var` local.
 - [x] Tipagem opcional em parâmetros de função.
+- [x] Imports básicos entre arquivos `.potion` no mesmo diretório.
 - [ ] Listas, tuplas e coleções adicionais.
-- [ ] Sistema de módulos e imports.
 - [x] Analisador semântico e checagens estáticas.
 - [ ] Geração direta de BEAM (sem Erlang intermediário).
 
@@ -329,6 +342,7 @@ pip install -e .
 - Chaves de mapa precisam ser identificadores simples e são emitidas como átomos Erlang.
 - `var` é voltado para estado mutável local de função, não para estado mutável no nível de módulo.
 - A checagem de tipos ainda é propositalmente leve e incompleta em comparação com um sistema de tipos completo.
+- Imports atualmente resolvem apenas arquivos `.potion` irmãos e expõem funções importadas, não valores globais importados.
 
 ---
 

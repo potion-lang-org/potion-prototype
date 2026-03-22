@@ -73,6 +73,30 @@ class TestCodegen(unittest.TestCase):
         self.assertIn("greet(Name, Age) ->", erlang_code)
         self.assertIn('Message = (Name ++ "!")', erlang_code)
 
+    def test_imported_function_call_codegen(self):
+        imported_ast = Parser(tokenize("""
+        fn greet(name: str) {
+            print(name)
+        }
+        """)).parse()
+        external_functions = {
+            ("greet", 1): {
+                "module_name": "helpers",
+                "params": imported_ast.statements[0].params,
+            }
+        }
+        code = """
+        import helpers
+        fn main() {
+            greet("Bruce")
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast, external_functions=external_functions)
+        erlang_code = codegen.generate()
+        self.assertIn('helpers:greet("Bruce")', erlang_code)
+
     def test_var_reassignment_codegen(self):
         code = """
         fn main() {

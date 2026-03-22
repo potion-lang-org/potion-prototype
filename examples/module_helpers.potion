@@ -1,0 +1,7 @@
+fn greet(name: str) {
+    print("Hello, " + name)
+}
+
+fn announce(name: str, age: int) {
+    print(name + " is " + to_string(age))
+}

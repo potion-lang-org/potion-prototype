@@ -4,6 +4,7 @@ from parser.potion_parser import (
     FunctionCall,
     FunctionParam,
     Identifier,
+    ImportStatement,
     IfBlock,
     LiteralBool,
     LiteralInt,
@@ -69,6 +70,7 @@ class SemanticAnalyzer:
         self.global_var_names = set()
         self.mutable_vars = set()
         self.var_versions = {}
+        self.external_functions = {}
 
     def emit_local_name(self, name):
         return name.capitalize()
@@ -260,7 +262,13 @@ class SemanticAnalyzer:
                 return str(value)
 
             if func_name not in self.functions:
-                raise Exception(f"Função '{func_name}' não definida.")
+                external = self.external_functions.get((func_name, len(args)))
+                if external is None:
+                    raise Exception(f"Função '{func_name}' não definida.")
+                params = external["params"]
+                self.validate_function_param_annotations(params)
+                self.validate_function_call_args(func_name, params, args)
+                return UNKNOWN
 
             func_def = self.functions[func_name]
             params = func_def["params"]
@@ -316,6 +324,8 @@ class SemanticAnalyzer:
             return DynamicValue()
         if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral)):
             return self.evaluate_expression(stmt)
+        if isinstance(stmt, ImportStatement):
+            return DynamicValue()
         if isinstance(stmt, (FunctionCall, BinaryOp, Identifier)):
             return self.evaluate_expression(stmt)
         return DynamicValue()

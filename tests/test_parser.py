@@ -2,6 +2,7 @@ import unittest
 from parser.potion_parser import (
     Assignment,
     FunctionDef,
+    ImportStatement,
     LiteralInt,
     LiteralNone,
     Parser,
@@ -54,3 +55,10 @@ class TestParser(unittest.TestCase):
         self.assertEqual(ast.statements[0].params[0].type_annotation, "str")
         self.assertEqual(ast.statements[0].params[1].name, "age")
         self.assertEqual(ast.statements[0].params[1].type_annotation, "int")
+
+    def test_import_statement(self):
+        tokens = tokenize("import helpers")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[0], ImportStatement)
+        self.assertEqual(ast.statements[0].module_name, "helpers")

@@ -1,19 +1,9 @@
-from cli.parse_potion_file import parse_potion_file
+from cli.module_loader import build_external_function_map, load_module_graph, sanitize_module_name
 from codegen.potion_codegen import ErlangCodegen
 import sys
 import os
 import subprocess
 import argparse
-import re
-
-
-def sanitize_module_name(source_name: str) -> str:
-    module_name = re.sub(r"[^a-zA-Z0-9_]", "_", source_name).lower()
-    if not module_name:
-        return "potion_module"
-    if not module_name[0].isalpha():
-        module_name = f"potion_{module_name}"
-    return module_name
 
 
 def main():
@@ -40,35 +30,43 @@ def main():
 
     filename = os.path.basename(abs_path)
     source_module_name = os.path.splitext(filename)[0]
-    module_name = sanitize_module_name(source_module_name)
 
     try:
-        ast = parse_potion_file(abs_path)
+        entry_module, loaded_modules = load_module_graph(abs_path)
+        module_name = entry_module.module_name
 
         if args.emit_ast:
             print("📦 AST:")
-            print(ast)
+            print(entry_module.ast)
             return
 
-        codegen = ErlangCodegen(ast, module_name=module_name)
-        erlang_code = codegen.generate()
+        modules_by_source_name = {module.source_name: module for module in loaded_modules}
 
         # Criar diretório target/ ou personalizado se não existir
         os.makedirs(args.outdir, exist_ok=True)
 
-        # Salvar .erl
-        output_path = os.path.join(args.outdir, f"{module_name}.erl")
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(erlang_code)
+        generated_outputs = []
+        for loaded_module in loaded_modules:
+            external_functions = build_external_function_map(loaded_module, modules_by_source_name)
+            codegen = ErlangCodegen(
+                loaded_module.ast,
+                module_name=loaded_module.module_name,
+                external_functions=external_functions,
+            )
+            erlang_code = codegen.generate()
 
-        print(f"\n✅ Erlang file generated: {output_path}")
-        if module_name != source_module_name:
-            print(f"ℹ️ Sanitized Erlang module name: {module_name}")
+            output_path = os.path.join(args.outdir, f"{loaded_module.module_name}.erl")
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(erlang_code)
+            generated_outputs.append(output_path)
+
+            print(f"\n✅ Erlang file generated: {output_path}")
+            if loaded_module is entry_module and loaded_module.module_name != source_module_name:
+                print(f"ℹ️ Sanitized Erlang module name: {loaded_module.module_name}")
 
         if not args.no_beam:
-            # Compilar com erlc
             print("🔧 Compiling with erlc...")
-            result = subprocess.run(["erlc", "-o", args.outdir, output_path], capture_output=True, text=True)
+            result = subprocess.run(["erlc", "-o", args.outdir, *generated_outputs], capture_output=True, text=True)
 
             if result.returncode != 0:
                 print("❌ erlc compilation failed:")
