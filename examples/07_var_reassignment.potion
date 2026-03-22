@@ -1,0 +1,7 @@
+fn main() {
+    var total: int = 1
+    total = total + 2
+    total = total * 3
+
+    print("Total = " + to_string(total))
+}

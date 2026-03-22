@@ -10,3 +10,5 @@ Files:
 - `04_maps_and_match.potion` - map literals and pattern matching.
 - `05_spawn_send_receive.potion` - process spawning, message sending and receiving.
 - `06_end_to_end_features.potion` - a compact end-to-end example combining several language features.
+- `07_var_reassignment.potion` - sequential local reassignment with `var`.
+- `08_var_reassignment_control_flow.potion` - `var` reassignment across `if` and `match` branches.

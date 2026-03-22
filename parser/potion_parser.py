@@ -23,6 +23,11 @@ class VarDeclaration(ASTNode):
         self.value = value
         self.type_annotation = type_annotation
 
+class Assignment(ASTNode):
+    def __init__(self, name: str, value: ASTNode):
+        self.name = name
+        self.value = value
+
 class FunctionDef(ASTNode):
     def __init__(self, name: str, params: List[str], body: List[ASTNode]):
         self.name = name
@@ -112,6 +117,10 @@ class Parser:
     def current(self) -> Token:
         return self.tokens[self.pos] if self.pos < len(self.tokens) else ("EOF", "")
 
+    def peek(self) -> Token:
+        next_pos = self.pos + 1
+        return self.tokens[next_pos] if next_pos < len(self.tokens) else ("EOF", "")
+
     def eat(self, kind: str) -> Token:
         tok = self.current()
         if tok[0] == kind:
@@ -139,6 +148,8 @@ class Parser:
             return self.if_block()
         elif tok[0] == "RETURN":
             return self.return_statement()
+        elif tok[0] == "ID" and self.peek()[0] == "ASSIGN":
+            return self.assignment()
         elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE"):
             return self.expression()
         else:
@@ -219,6 +230,12 @@ class Parser:
         self.eat("RETURN")
         expr = self.expression()
         return ReturnStatement(expr)
+
+    def assignment(self) -> Assignment:
+        name = self.eat("ID")[1]
+        self.eat("ASSIGN")
+        expr = self.expression()
+        return Assignment(name, expr)
 
 
     def send_expression(self) -> SendExpression:

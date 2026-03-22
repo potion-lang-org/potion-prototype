@@ -1,0 +1,16 @@
+fn main() {
+    var total: int = 1
+
+    if true {
+        total = total + 2
+    } else {
+        total = total + 10
+    }
+
+    match {bonus: 4} {
+        {bonus: value} => total = total + value
+        _ => total = total
+    }
+
+    print("Final total = " + to_string(total))
+}

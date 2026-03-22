@@ -94,10 +94,19 @@ var current = none
 var current: none = none
 ```
 
+Reatribuição local é suportada:
+
+```potion
+var total: int = 1
+total = total + 1
+```
+
 Importante:
 
-- `var` atualmente suporta apenas declaração
-- sintaxe de reatribuição como `current = other` ainda não existe
+- reatribuição é suportada para `var` local dentro de funções
+- `var` global continua sendo emitido como macro Erlang e não é reatribuível
+- atribuir a um `val` faz o compilador falhar
+- a reatribuição preserva o tipo previamente estabelecido da variável
 
 ### Bindings globais e locais
 
@@ -116,6 +125,7 @@ vira:
 ```
 
 Bindings locais dentro de funções são emitidos como variáveis Erlang capitalizadas.
+Para `var` local mutável, o compilador emite internamente variáveis Erlang versionadas para preservar o modelo de single-assignment do Erlang.
 
 ## Funções
 
@@ -148,6 +158,7 @@ Formas de expressão suportadas:
 - blocos `receive`
 - `send(...)`
 - `sp ...`
+- instruções de atribuição para `var` local previamente declarado
 
 ### Operadores
 
@@ -226,6 +237,7 @@ if score > 0 {
 ```
 
 Isso é emitido como um `case` de Erlang sobre a condição.
+Quando `var` mutáveis são reatribuídas dentro de ramos, o compilador emite um merge após o `case` para que expressões posteriores usem o valor atualizado.
 
 ## Mapas e Pattern Matching
 
@@ -313,6 +325,7 @@ receive message {
 ```
 
 Compila para `receive ... end` em Erlang.
+Se `var` mutáveis forem reatribuídas dentro do corpo de `receive` ou de `match` aninhados, o compilador faz merge da versão final após a expressão de controle de fluxo.
 
 ## Regras de Geração de Código
 
@@ -320,6 +333,7 @@ Convenções importantes atuais do codegen:
 
 - declarações no topo do arquivo viram macros Erlang
 - identificadores locais viram variáveis Erlang capitalizadas
+- `var` locais mutáveis viram variáveis Erlang versionadas
 - `if` vira `case`
 - `match` vira `case`
 - mapas viram maps Erlang
@@ -344,7 +358,7 @@ Exemplo:
 
 ## Limites Atuais
 
-- `var` ainda não possui sintaxe de reatribuição
+- `var` global ainda não é reatribuível
 - anotações de tipo em parâmetros não existem
 - não há sistema de módulos/imports
 - ainda não existem listas nem tuplas na sintaxe Potion

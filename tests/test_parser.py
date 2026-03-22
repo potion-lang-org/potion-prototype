@@ -1,5 +1,5 @@
 import unittest
-from parser.potion_parser import Parser, ValDeclaration, VarDeclaration, LiteralInt, LiteralNone, tokenize
+from parser.potion_parser import Parser, ValDeclaration, VarDeclaration, Assignment, LiteralInt, LiteralNone, tokenize
 
 class TestParser(unittest.TestCase):
     def test_simple_val(self):
@@ -19,3 +19,15 @@ class TestParser(unittest.TestCase):
         self.assertEqual(ast.statements[0].name, "current")
         self.assertEqual(ast.statements[0].type_annotation, "none")
         self.assertIsInstance(ast.statements[0].value, LiteralNone)
+
+    def test_assignment_statement(self):
+        tokens = tokenize("""
+        fn main() {
+            var total: int = 1
+            total = total + 1
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[0].body[1], Assignment)
+        self.assertEqual(ast.statements[0].body[1].name, "total")

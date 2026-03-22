@@ -30,6 +30,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 
 - `val` declarations with optional type hints (`val total: int = 42`).
 - `var` declarations with optional type hints (`var current: none = none`).
+- Local reassignment for `var` with syntax like `current = next_value`.
 - Functions with parameters, local bindings, and explicit `return`.
 - Literals for integers, strings, booleans, maps, and `none`.
 - Arithmetic (`+`, `-`, `*`, `/`) and comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`).
@@ -63,7 +64,8 @@ var maybe_name: none = none
 ```
 
 > ℹ️ Global names become `?MACROS` in Erlang; locals keep a Capitalized style (`Value`).
-> `var` is currently supported as a declaration form, but not as reassignment syntax.
+> `var` supports local reassignment inside functions.
+> Global `var` bindings are still emitted as macros and are not reassignable.
 
 ### Functions
 ```potion
@@ -88,6 +90,18 @@ val pid_ref: pid = self()
 ```
 
 → `none` is emitted as `undefined` in Erlang.
+
+### `var` reassignment
+```potion
+fn accumulate() {
+    var total: int = 1
+    total = total + 2
+    print(total)
+}
+```
+
+Potion compiles local `var` reassignment to versioned Erlang variables internally.
+That preserves Erlang's single-assignment semantics while exposing mutable-style syntax at the Potion level.
 
 ### Conditionals
 ```potion
@@ -201,7 +215,8 @@ val total: int = 10
 var fallback: none = none
 
 fn main() {
-    val approved: bool = total >= 5
+    var approved: bool = false
+    approved = total >= 5
 
     if approved {
         print("ok")
@@ -288,7 +303,7 @@ pip install -e .
 - [x] Map literals with basic pattern matching.
 - [x] Concurrency primitives (`sp`, `send`, `receive`, `match`).
 - [x] Official CLI for transpile/compile/run.
-- [ ] Reassignment / mutable update syntax for `var`.
+- [x] Reassignment / mutable update syntax for local `var`.
 - [ ] Lists, tuples, and richer collection literals.
 - [ ] Module system and imports.
 - [ ] Semantic analyser and static checks.
@@ -302,7 +317,7 @@ pip install -e .
 - Function parameters do not have type annotations yet.
 - `print(...)` currently expects a single argument.
 - Map keys must be bare identifiers and are emitted as Erlang atoms.
-- `var` supports declaration, but not reassignment syntax such as `x = y`.
+- Global `var` bindings are not reassignable.
 - Type checking is intentionally lightweight and still tied to code generation.
 
 ---
