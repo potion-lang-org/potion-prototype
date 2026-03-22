@@ -17,7 +17,7 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 ## ✨ Goals
 
 - Modern, lightweight syntax (Python/Rust vibes) that targets Erlang/OTP.
-- Simple bindings with `val` and `var`, currently compiled as Erlang bindings/macros.
+- Simple bindings with `val` and local mutable bindings with `var`.
 - Optional type annotations with basic inference.
 - First-class concurrency primitives (`sp`, `send`, `receive`, `match`).
 - Ergonomic pattern matching and map literals that translate to Erlang maps.
@@ -53,19 +53,16 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 ```potion
 val rate = 5
 val message = "Hello"
-var maybe_name: none = none
 ```
 
 → Emitted as Erlang macros:
 ```erlang
 -define(RATE, 5).
 -define(MESSAGE, "Hello").
--define(MAYBE_NAME, undefined).
 ```
 
 > ℹ️ Global names become `?MACROS` in Erlang; locals keep a Capitalized style (`Value`).
-> `var` supports local reassignment inside functions.
-> Global `var` bindings are still emitted as macros and are not reassignable.
+> Potion uses `val` for module-level bindings and `var` for mutable local state inside functions.
 
 ### Functions
 ```potion
@@ -84,7 +81,7 @@ calculate() ->
 
 ### Types and `none`
 ```potion
-var current: none = none
+val current: none = none
 val ready: bool = true
 val pid_ref: pid = self()
 ```
@@ -317,7 +314,7 @@ pip install -e .
 - Function parameters do not have type annotations yet.
 - `print(...)` currently expects a single argument.
 - Map keys must be bare identifiers and are emitted as Erlang atoms.
-- Global `var` bindings are not reassignable.
+- `var` is intended for function-local mutable state, not module-level mutable state.
 - Type checking is intentionally lightweight and still tied to code generation.
 
 ---

@@ -10,7 +10,7 @@ Potion is a small language that compiles to Erlang source code.
 
 Current implementation focus:
 
-- simple declarations with `val` and `var`
+- simple declarations with `val` and local mutable bindings with `var`
 - functions and returns
 - arithmetic and comparisons
 - maps and pattern matching
@@ -87,7 +87,7 @@ val total: int = 10
 
 ### `var`
 
-Declaration form also supported by the compiler:
+Function-local mutable binding form supported by the compiler:
 
 ```potion
 var current = none
@@ -104,24 +104,23 @@ total = total + 1
 Important:
 
 - reassignment is supported for local `var` bindings inside functions
-- global `var` bindings are still emitted as Erlang macros and are not reassignable
+- `var` is intended for function-local mutable state
+- module-level mutable global state is not part of the language model
 - assigning to a `val` is rejected by the compiler
 - reassignment preserves the previously established type of the variable
 
 ### Global vs local bindings
 
-Top-level `val` and `var` are emitted as Erlang macros:
+Top-level bindings are expressed with `val` and are emitted as Erlang macros:
 
 ```potion
 val base = 10
-var maybe_name: none = none
 ```
 
 becomes:
 
 ```erlang
 -define(BASE, 10).
--define(MAYBE_NAME, undefined).
 ```
 
 Local bindings inside functions are emitted as capitalized Erlang variables.
@@ -358,7 +357,7 @@ Example:
 
 ## Current Limitations
 
-- global `var` bindings are not reassignable
+- module-level mutable state is not part of the language
 - parameter type annotations are not implemented
 - there is no module/import system
 - there are no lists or tuples in Potion syntax yet
