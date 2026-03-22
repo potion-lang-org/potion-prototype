@@ -12,10 +12,13 @@ class PidValue:
 class DynamicValue:
     pass
 
+UNKNOWN = DynamicValue()
+
 TYPE_MAP = {
     "int": int,
     "str": str,
     "bool": bool,
+    "none": type(None),
     "pid": PidValue,
     "dynamic": DynamicValue
 }
@@ -24,6 +27,7 @@ REVERSE_TYPE_MAP = {
     int: "int",
     str: "str",
     bool: "bool",
+    type(None): "none",
     PidValue: "pid",
     DynamicValue: "dynamic"
 }
@@ -43,6 +47,7 @@ class ErlangCodegen:
         self.function_arities = {}
         self.function_params = {}
         self.global_var_names = set()
+        self.uses_to_string_builtin = False
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -56,6 +61,8 @@ class ErlangCodegen:
             self.lines.append(f"-define({var_name.upper()}, {value}).")
 
         self.visit(self.ast)
+        if self.uses_to_string_builtin:
+            self.append_to_string_builtin()
         return "\n".join(self.lines)
 
     def collect_function_names_and_globals(self, node):
@@ -65,7 +72,11 @@ class ErlangCodegen:
                     self.function_names.append(stmt.name)
                     self.function_arities[stmt.name] = len(stmt.params)  
                     self.function_params[stmt.name] = stmt.params
-                elif isinstance(stmt, ValDeclaration):
+                    self.functions[stmt.name] = {
+                        "params": stmt.params,
+                        "body": stmt.body,
+                    }
+                elif isinstance(stmt, (ValDeclaration, VarDeclaration)):
                     self.global_var_names.add(stmt.name)
                     value = self.visit(stmt.value)
                     self.global_vars.append((stmt.name, value))
@@ -86,16 +97,22 @@ class ErlangCodegen:
 
     def visit_Program(self, node):
         for stmt in node.statements:
-            if not isinstance(stmt, ValDeclaration):  # Variáveis já tratadas
+            if not isinstance(stmt, (ValDeclaration, VarDeclaration)):  # Globais já tratadas
                 self.visit(stmt)
 
     def visit_ValDeclaration(self, node):
+        return self.emit_binding(node)
+
+    def visit_VarDeclaration(self, node):
+        return self.emit_binding(node)
+
+    def emit_binding(self, node):
         if self.inside_function:
             self.local_vars.add(node.name)
         var_name = self.emit_name(node.name)
         value_code = self.visit(node.value)
 
-        self.type_checking(node, scope = "local")
+        self.type_checking(node, scope="local" if self.inside_function else "global")
 
         return f"{var_name} = {value_code}"
 
@@ -108,6 +125,11 @@ class ErlangCodegen:
             expected_type = TYPE_MAP.get(node.type_annotation)
             if expected_type is None:
                 raise Exception(f"Tipo desconhecido ({scope}) em '{node.name}': {node.type_annotation}")
+
+            if evaluated_value is UNKNOWN:
+                self.type_env[var_name] = node.type_annotation
+                self.variables[var_name] = UNKNOWN
+                return
 
             if not isinstance(evaluated_value, expected_type):
                 actual_type = self.infer_type(evaluated_value)
@@ -136,9 +158,13 @@ class ErlangCodegen:
             return node.value
         elif isinstance(node, LiteralBool):
             return node.value
+        elif isinstance(node, LiteralNone):
+            return None
         elif isinstance(node, BinaryOp):
             left = self.evaluate_expression(node.left)
             right = self.evaluate_expression(node.right)
+            if left is UNKNOWN or right is UNKNOWN:
+                return self.evaluate_unknown_binary(node.op)
             if node.op == "+":
                 return left + right
             elif node.op == "-":
@@ -155,11 +181,17 @@ class ErlangCodegen:
                 return left > right
             elif node.op == "<":
                 return left < right
+            elif node.op == ">=":
+                return left >= right
+            elif node.op == "<=":
+                return left <= right
             else:
                 raise Exception(f"Operação não suportada: {node.op}")
         elif isinstance(node, Identifier):
             var_name = self.emit_name(node.name)
             if var_name not in self.variables:
+                if self.inside_function and node.name in self.local_vars:
+                    return UNKNOWN
                 raise Exception(f"Variável '{node.name}' não declarada.")
             return self.variables[var_name]
         elif isinstance(node, FunctionCall):
@@ -168,6 +200,19 @@ class ErlangCodegen:
 
             if func_name == "self":
                 return PidValue()
+            if func_name == "to_string":
+                if len(args) != 1:
+                    raise Exception(f"Função '{func_name}' espera 1 argumento(s), recebeu {len(args)}.")
+                value = args[0]
+                if value is UNKNOWN:
+                    return ""
+                if value is None:
+                    return "undefined"
+                if isinstance(value, bool):
+                    return "true" if value else "false"
+                if isinstance(value, str):
+                    return value
+                return str(value)
 
             if func_name not in self.functions:
                 raise Exception(f"Função '{func_name}' não definida.")
@@ -218,9 +263,34 @@ class ErlangCodegen:
         for stmt in body:
             if isinstance(stmt, ReturnStatement):
                 return self.evaluate_expression(stmt.value)
-            else:
-                result = self.visit(stmt)
+            result = self.evaluate_statement(stmt)
         return result
+
+    def evaluate_unknown_binary(self, op):
+        if op in ("==", "!=", ">", "<", ">=", "<="):
+            return False
+        return UNKNOWN
+
+    def evaluate_statement(self, stmt):
+        if isinstance(stmt, (ValDeclaration, VarDeclaration)):
+            self.type_checking(stmt)
+            return self.variables[self.emit_name(stmt.name)]
+        if isinstance(stmt, IfBlock):
+            condition = self.evaluate_expression(stmt.condition)
+            branch = stmt.if_body if condition else (stmt.else_body or [])
+            return self.evaluate_block(branch)
+        if isinstance(stmt, PrintCall):
+            self.evaluate_expression(stmt.value)
+            return DynamicValue()
+        if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral)):
+            return self.evaluate_expression(stmt)
+        if isinstance(stmt, FunctionCall):
+            return self.evaluate_expression(stmt)
+        if isinstance(stmt, BinaryOp):
+            return self.evaluate_expression(stmt)
+        if isinstance(stmt, Identifier):
+            return self.evaluate_expression(stmt)
+        return DynamicValue()
 
 
     def visit_FunctionDef(self, node):
@@ -276,6 +346,13 @@ class ErlangCodegen:
 
 
     def visit_FunctionCall(self, node: FunctionCall):
+        if node.name == "to_string":
+            if len(node.args) != 1:
+                raise Exception(f"Função '{node.name}' espera 1 argumento(s), recebeu {len(node.args)}.")
+            self.uses_to_string_builtin = True
+            arg_code = self.visit(node.args[0])
+            return f"potion_to_string_builtin({arg_code})"
+
         args_code = [self.visit(arg) for arg in node.args]
         return f"{node.name}({', '.join(args_code)})"
 
@@ -386,6 +463,8 @@ class ErlangCodegen:
             return self.visit_LiteralInt(pattern)
         if isinstance(pattern, LiteralStr):
             return self.visit_LiteralStr(pattern)
+        if isinstance(pattern, LiteralNone):
+            return self.visit_LiteralNone(pattern)
         if isinstance(pattern, MapLiteral):
             return self.emit_pattern_map(pattern)
         return self.visit(pattern)
@@ -413,6 +492,9 @@ class ErlangCodegen:
     
     def visit_LiteralStr(self, node):
         return f'"{node.value}"'
+
+    def visit_LiteralNone(self, node):
+        return "undefined"
 
     def visit_Identifier(self, node):
         if node.name in RESERVED_WORDS:
@@ -492,6 +574,25 @@ class ErlangCodegen:
     def is_string_expression(self, node):
         if isinstance(node, LiteralStr):
             return True
+        if isinstance(node, FunctionCall) and node.name == "to_string":
+            return True
         if isinstance(node, BinaryOp) and node.op == "+":
             return self.is_string_expression(node.left) or self.is_string_expression(node.right)
         return False
+
+    def append_to_string_builtin(self):
+        self.lines.append("")
+        self.lines.append("potion_to_string_builtin(Value) when is_list(Value) ->")
+        self.lines.append("    Value;")
+        self.lines.append("potion_to_string_builtin(Value) when is_integer(Value) ->")
+        self.lines.append("    integer_to_list(Value);")
+        self.lines.append("potion_to_string_builtin(Value) when is_boolean(Value) ->")
+        self.lines.append("    atom_to_list(Value);")
+        self.lines.append("potion_to_string_builtin(undefined) ->")
+        self.lines.append('    "undefined";')
+        self.lines.append("potion_to_string_builtin(Value) when is_atom(Value) ->")
+        self.lines.append("    atom_to_list(Value);")
+        self.lines.append("potion_to_string_builtin(Value) when is_binary(Value) ->")
+        self.lines.append("    binary_to_list(Value);")
+        self.lines.append("potion_to_string_builtin(Value) ->")
+        self.lines.append('    lists:flatten(io_lib:format("~p", [Value])).')

@@ -1,0 +1,15 @@
+fn describe(person) {
+    match person {
+        {name: who, age: years} => {
+            print("Name: " + who)
+            print("Age received")
+            print(who + " age is " + to_string(years))
+        }
+        _ => print("Unknown person")
+    }
+}
+
+fn main() {
+    val person = {name: "Bruce", age: 42}
+    describe(person)
+}

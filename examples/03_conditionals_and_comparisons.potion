@@ -1,0 +1,14 @@
+fn classify(score) {
+    val approved: bool = score >= 7
+
+    if approved {
+        print("approved")
+    } else {
+        print("rejected")
+    }
+}
+
+fn main() {
+    classify(8)
+    classify(5)
+}
