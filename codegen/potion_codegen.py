@@ -48,6 +48,8 @@ class ErlangCodegen:
         self.function_params = {}
         self.global_var_names = set()
         self.uses_to_string_builtin = False
+        self.mutable_vars = set()
+        self.var_versions = {}
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -109,12 +111,46 @@ class ErlangCodegen:
     def emit_binding(self, node):
         if self.inside_function:
             self.local_vars.add(node.name)
+            if isinstance(node, VarDeclaration):
+                self.mutable_vars.add(node.name)
+                self.var_versions.setdefault(node.name, 0)
         var_name = self.emit_name(node.name)
         value_code = self.visit(node.value)
 
         self.type_checking(node, scope="local" if self.inside_function else "global")
 
         return f"{var_name} = {value_code}"
+
+    def visit_Assignment(self, node):
+        if not self.inside_function:
+            raise Exception(f"Reatribuição não suportada fora de função: '{node.name}'")
+        if node.name not in self.mutable_vars:
+            raise Exception(f"Variável '{node.name}' não foi declarada com var.")
+        if node.name in self.global_var_names:
+            raise Exception(f"Reatribuição global ainda não é suportada: '{node.name}'")
+
+        expected_type = self.current_type_for(node.name)
+        evaluated_value = self.evaluate_expression(node.value)
+        value_code = self.visit(node.value)
+        next_version = self.var_versions.get(node.name, 0) + 1
+        next_name = self.emit_versioned_name(node.name, next_version)
+
+        if expected_type is not None:
+            if evaluated_value is not UNKNOWN and self.infer_type(evaluated_value) != expected_type:
+                actual_type = self.infer_type(evaluated_value)
+                raise Exception(
+                    f"Erro de tipo (local) em reatribuição de '{node.name}': esperado {expected_type}, mas recebeu {actual_type}"
+                )
+            self.type_env[next_name] = expected_type
+        elif evaluated_value is not UNKNOWN:
+            inferred = self.infer_type(evaluated_value)
+            if inferred != "unknown":
+                self.type_env[next_name] = inferred
+
+        self.var_versions[node.name] = next_version
+        self.variables[next_name] = evaluated_value
+
+        return f"{next_name} = {value_code}"
 
     def type_checking(self, node, scope = "local"):
         var_name = self.emit_name(node.name)
@@ -275,6 +311,9 @@ class ErlangCodegen:
         if isinstance(stmt, (ValDeclaration, VarDeclaration)):
             self.type_checking(stmt)
             return self.variables[self.emit_name(stmt.name)]
+        if isinstance(stmt, Assignment):
+            self.visit_Assignment(stmt)
+            return self.variables[self.emit_name(stmt.name)]
         if isinstance(stmt, IfBlock):
             condition = self.evaluate_expression(stmt.condition)
             branch = stmt.if_body if condition else (stmt.else_body or [])
@@ -309,8 +348,12 @@ class ErlangCodegen:
         # === CONTROLE DE ESCOPO LOCAL ===
         prev_inside = self.inside_function
         prev_locals = self.local_vars
+        prev_mutable = self.mutable_vars.copy()
+        prev_versions = self.var_versions.copy()
         self.inside_function = True
         self.local_vars = set(node.params)
+        self.mutable_vars = set()
+        self.var_versions = {}
 
         # === GERAÇÃO DO CORPO ===
         # body_lines = []
@@ -343,6 +386,8 @@ class ErlangCodegen:
         # === RESTAURA CONTEXTO ===
         self.inside_function = prev_inside
         self.local_vars = prev_locals
+        self.mutable_vars = prev_mutable
+        self.var_versions = prev_versions
 
 
     def visit_FunctionCall(self, node: FunctionCall):
@@ -380,65 +425,52 @@ class ErlangCodegen:
         binding_name = self.emit_local_name(node.var_name)
         prev_inside = self.inside_function
         prev_locals = self.local_vars.copy()
+        merge_vars = self.collect_assigned_mutables(node.body)
+        start_versions = self.var_versions.copy()
         self.inside_function = True
         self.local_vars = prev_locals | {node.var_name}
-
-        body_lines = []
-        if node.body:
-            *stmts, last = node.body
-            for stmt in stmts:
-                code = self.visit(stmt)
-                if code:
-                    formatted = self.format_with_indent(code, "        ")
-                    body_lines.append(f"{formatted},")
-            last_code = self.visit(last) or 'ok'
-            formatted_last = self.format_with_indent(last_code, "        ")
-            body_lines.append(formatted_last)
-        else:
-            body_lines.append("        ok")
+        body_code, end_versions = self.emit_branch_body(node.body, merge_vars, start_versions)
 
         self.inside_function = prev_inside
         self.local_vars = prev_locals
+        self.var_versions = start_versions
 
-        inner = "\n".join(body_lines)
-        return f"receive {binding_name} ->\n{inner}\n    end"
+        inner = self.format_with_indent(body_code, "        ")
+        receive_code = f"receive {binding_name} ->\n{inner}\n    end"
+        return self.wrap_control_flow_with_merge(receive_code, merge_vars, [end_versions])
 
     def visit_MatchExpression(self, node: MatchExpression):
         value_code = self.visit(node.value)
+        merge_vars = self.collect_assigned_mutables(
+            [clause_stmt for clause in node.clauses for clause_stmt in clause.body]
+        )
+        start_versions = self.var_versions.copy()
         clauses_code = []
+        branch_versions = []
         for idx, clause in enumerate(node.clauses):
-            clause_code = self.generate_match_clause(clause)
+            clause_code, end_versions = self.generate_match_clause(clause, merge_vars, start_versions)
             if idx < len(node.clauses) - 1:
                 clause_code += ";"
             clauses_code.append(clause_code)
+            branch_versions.append(end_versions)
 
         clauses_block = "\n".join(clauses_code) if clauses_code else "    _ ->\n        ok"
-        return f"case {value_code} of\n{clauses_block}\nend"
+        self.var_versions = start_versions
+        case_code = f"case {value_code} of\n{clauses_block}\nend"
+        return self.wrap_control_flow_with_merge(case_code, merge_vars, branch_versions)
 
-    def generate_match_clause(self, clause: MatchClause):
+    def generate_match_clause(self, clause: MatchClause, merge_vars, start_versions):
+        self.var_versions = start_versions.copy()
         pattern_code = self.emit_pattern(clause.pattern)
         prev_locals = self.local_vars.copy()
         bindings = self.collect_pattern_bindings(clause.pattern)
         self.local_vars |= bindings
-
-        clause_lines = []
-        if clause.body:
-            *stmts, last = clause.body
-            for stmt in stmts:
-                code = self.visit(stmt)
-                if code:
-                    formatted = self.format_with_indent(code, "        ")
-                    clause_lines.append(f"{formatted},")
-            last_code = self.visit(last) or 'ok'
-            formatted_last = self.format_with_indent(last_code, "        ")
-            clause_lines.append(formatted_last)
-        else:
-            clause_lines.append("        ok")
+        clause_body, end_versions = self.emit_branch_body(clause.body, merge_vars, start_versions)
 
         self.local_vars = prev_locals
 
-        clause_body = "\n".join(clause_lines)
-        return f"    {pattern_code} ->\n{clause_body}"
+        formatted_body = self.format_with_indent(clause_body, "        ")
+        return f"    {pattern_code} ->\n{formatted_body}", end_versions
 
     def collect_pattern_bindings(self, pattern):
         bindings = set()
@@ -514,10 +546,12 @@ class ErlangCodegen:
 
     def visit_IfBlock(self, node):
         cond = self.visit(node.condition)
-        if_body = ",\n        ".join(self.visit(s) for s in node.if_body)
+        merge_vars = self.collect_assigned_mutables((node.if_body or []) + (node.else_body or []))
+        start_versions = self.var_versions.copy()
+        if_body, if_versions = self.emit_branch_body(node.if_body, merge_vars, start_versions)
         if node.else_body:
-            else_body = ",\n        ".join(self.visit(s) for s in node.else_body)
-            return (
+            else_body, else_versions = self.emit_branch_body(node.else_body, merge_vars, start_versions)
+            case_code = (
                 f"case {cond} of\n"
                 f"    true ->\n"
                 f"        {if_body};\n"
@@ -525,14 +559,19 @@ class ErlangCodegen:
                 f"        {else_body}\n"
                 f"end"
             )
-        return (
+            self.var_versions = start_versions
+            return self.wrap_control_flow_with_merge(case_code, merge_vars, [if_versions, else_versions])
+        else_body, else_versions = self.emit_branch_body([], merge_vars, start_versions)
+        case_code = (
             f"case {cond} of\n"
             f"    true ->\n"
             f"        {if_body};\n"
             f"    _ ->\n"
-            f"        ok\n"
+            f"        {else_body}\n"
             f"end"
         )
+        self.var_versions = start_versions
+        return self.wrap_control_flow_with_merge(case_code, merge_vars, [if_versions, else_versions])
 
     def visit_ReturnStatement(self, node):
         return self.visit(node.value)
@@ -548,8 +587,14 @@ class ErlangCodegen:
     def emit_local_name(self, name):
         return name.capitalize()
 
+    def emit_versioned_name(self, name, version):
+        return f"{self.emit_local_name(name)}_{version}"
+
     def emit_name(self, name):
         if self.inside_function:
+            if name in self.mutable_vars:
+                version = self.var_versions.get(name, 0)
+                return self.emit_versioned_name(name, version)
             if name in self.local_vars:
                 return self.emit_local_name(name)
             if name in self.global_var_names:
@@ -579,6 +624,82 @@ class ErlangCodegen:
         if isinstance(node, BinaryOp) and node.op == "+":
             return self.is_string_expression(node.left) or self.is_string_expression(node.right)
         return False
+
+    def current_type_for(self, name):
+        current_name = self.emit_name(name)
+        return self.type_env.get(current_name)
+
+    def collect_assigned_mutables(self, statements):
+        assigned = []
+        for stmt in statements or []:
+            if isinstance(stmt, Assignment) and stmt.name in self.mutable_vars:
+                assigned.append(stmt.name)
+            elif isinstance(stmt, IfBlock):
+                assigned.extend(self.collect_assigned_mutables(stmt.if_body))
+                assigned.extend(self.collect_assigned_mutables(stmt.else_body or []))
+            elif isinstance(stmt, MatchExpression):
+                for clause in stmt.clauses:
+                    assigned.extend(self.collect_assigned_mutables(clause.body))
+            elif isinstance(stmt, ReceiveBlock):
+                assigned.extend(self.collect_assigned_mutables(stmt.body))
+        return list(dict.fromkeys(assigned))
+
+    def emit_merge_return_expr(self, merge_vars):
+        values = [self.emit_name(name) for name in merge_vars]
+        if not values:
+            return "ok"
+        if len(values) == 1:
+            return values[0]
+        return "{" + ", ".join(values) + "}"
+
+    def emit_merge_target(self, merge_vars, branch_versions):
+        targets = []
+        for name in merge_vars:
+            next_version = self.next_merge_version(name, branch_versions)
+            targets.append(self.emit_versioned_name(name, next_version))
+        if len(targets) == 1:
+            return targets[0]
+        return "{" + ", ".join(targets) + "}"
+
+    def wrap_control_flow_with_merge(self, code, merge_vars, branch_versions):
+        if not merge_vars:
+            return code
+
+        target = self.emit_merge_target(merge_vars, branch_versions)
+        for name in merge_vars:
+            current_name = self.emit_name(name)
+            next_version = self.next_merge_version(name, branch_versions)
+            next_name = self.emit_versioned_name(name, next_version)
+            self.var_versions[name] = next_version
+            if current_name in self.type_env:
+                self.type_env[next_name] = self.type_env[current_name]
+            self.variables[next_name] = UNKNOWN
+        return f"{target} = {code}"
+
+    def emit_branch_body(self, statements, merge_vars, start_versions):
+        self.var_versions = start_versions.copy()
+        if not statements:
+            return self.emit_merge_return_expr(merge_vars) if merge_vars else "ok", self.var_versions.copy()
+
+        lines = []
+        *stmts, last = statements
+        for stmt in stmts:
+            code = self.visit(stmt)
+            if code:
+                lines.append(code)
+        last_code = self.visit(last) or "ok"
+        if merge_vars:
+            lines.append(last_code)
+            lines.append(self.emit_merge_return_expr(merge_vars))
+        else:
+            lines.append(last_code)
+        return ",\n        ".join(lines), self.var_versions.copy()
+
+    def next_merge_version(self, name, branch_versions):
+        max_version = self.var_versions.get(name, 0)
+        for versions in branch_versions:
+            max_version = max(max_version, versions.get(name, 0))
+        return max_version + 1
 
     def append_to_string_builtin(self):
         self.lines.append("")

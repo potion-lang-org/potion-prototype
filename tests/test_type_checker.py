@@ -45,3 +45,63 @@ class TestTypeChecker(unittest.TestCase):
         codegen = ErlangCodegen(ast)
         erlang_code = codegen.generate()
         self.assertIn('Rendered = potion_to_string_builtin(Age)', erlang_code)
+
+    def test_reassignment_requires_var(self):
+        code = """
+        fn main() {
+            val total: int = 1
+            total = 2
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("não foi declarada com var", str(ctx.exception))
+
+    def test_reassignment_preserves_declared_type(self):
+        code = """
+        fn main() {
+            var total: int = 1
+            total = 2
+            print(total)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("Total_1 = 2", erlang_code)
+
+    def test_reassignment_inside_if_preserves_type(self):
+        code = """
+        fn main() {
+            var total: int = 1
+            if true {
+                total = 2
+            } else {
+                total = 3
+            }
+            print(total)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("Total_2 = case true of", erlang_code)
+
+    def test_reassignment_to_wrong_type_raises(self):
+        code = """
+        fn main() {
+            var total: int = 1
+            total = "wrong"
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("Erro de tipo (local) em reatribuição de 'total'", str(ctx.exception))

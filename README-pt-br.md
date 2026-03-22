@@ -28,6 +28,7 @@ O objetivo é facilitar a escrita de regras de negócio de forma clara e segura,
 
 - Declarações `val` com anotações de tipo opcionais (`val total: int = 42`).
 - Declarações `var` com anotações de tipo opcionais (`var current: none = none`).
+- Reatribuição local de `var` com sintaxe como `current = next_value`.
 - Funções com parâmetros, variáveis locais e `return` explícito.
 - Literais para inteiros, strings, booleanos, mapas e `none`.
 - Operadores aritméticos (`+`, `-`, `*`, `/`) e comparações (`==`, `!=`, `<`, `>`, `<=`, `>=`).
@@ -61,7 +62,8 @@ var talvez_nome: none = none
 ```
 
 > ℹ️ Nomes globais viram `?MACROS`; variáveis locais recebem estilo Capitalizado (`Valor`).
-> `var` hoje funciona como forma de declaração, mas ainda não possui sintaxe de reatribuição.
+> `var` suporta reatribuição local dentro de funções.
+> `var` global continua sendo emitido como macro e não é reatribuível.
 
 ### Funções
 ```potion
@@ -86,6 +88,18 @@ val meu_pid: pid = self()
 ```
 
 → `none` é emitido como `undefined` em Erlang.
+
+### Reatribuição de `var`
+```potion
+fn acumular() {
+    var total: int = 1
+    total = total + 2
+    print(total)
+}
+```
+
+Potion compila a reatribuição local de `var` para variáveis Erlang versionadas internamente.
+Isso preserva a semântica de single-assignment do Erlang, enquanto expõe sintaxe mutável no nível de Potion.
 
 ### Condicionais
 ```potion
@@ -199,7 +213,8 @@ val total: int = 10
 var fallback: none = none
 
 fn main() {
-    val aprovado: bool = total >= 5
+    var aprovado: bool = false
+    aprovado = total >= 5
 
     if aprovado {
         print("ok")
@@ -286,7 +301,7 @@ pip install -e .
 - [x] Literais de mapa com pattern matching básico.
 - [x] Primitivas de concorrência (`sp`, `send`, `receive`, `match`).
 - [x] CLI oficial para transpilar/compilar/executar.
-- [ ] Sintaxe de reatribuição / atualização mutável para `var`.
+- [x] Sintaxe de reatribuição / atualização mutável para `var` local.
 - [ ] Listas, tuplas e coleções adicionais.
 - [ ] Sistema de módulos e imports.
 - [ ] Analisador semântico e checagens estáticas.
@@ -300,7 +315,7 @@ pip install -e .
 - Parâmetros de função ainda não possuem anotação de tipo.
 - `print(...)` atualmente aceita um único argumento.
 - Chaves de mapa precisam ser identificadores simples e são emitidas como átomos Erlang.
-- `var` suporta declaração, mas não reatribuição com sintaxe como `x = y`.
+- `var` global ainda não é reatribuível.
 - A checagem de tipos ainda é propositalmente leve e acoplada à geração de código.
 
 ---

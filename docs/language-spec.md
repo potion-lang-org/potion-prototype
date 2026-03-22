@@ -94,10 +94,19 @@ var current = none
 var current: none = none
 ```
 
+Local reassignment is supported:
+
+```potion
+var total: int = 1
+total = total + 1
+```
+
 Important:
 
-- `var` currently supports declaration only
-- reassignment syntax such as `current = other` is not implemented
+- reassignment is supported for local `var` bindings inside functions
+- global `var` bindings are still emitted as Erlang macros and are not reassignable
+- assigning to a `val` is rejected by the compiler
+- reassignment preserves the previously established type of the variable
 
 ### Global vs local bindings
 
@@ -116,6 +125,7 @@ becomes:
 ```
 
 Local bindings inside functions are emitted as capitalized Erlang variables.
+For mutable local `var`, the compiler internally emits versioned Erlang variables to preserve Erlang's single-assignment model.
 
 ## Functions
 
@@ -148,6 +158,7 @@ Supported expression forms:
 - `receive` blocks
 - `send(...)`
 - `sp ...`
+- assignment statements for previously declared local `var`
 
 ### Operators
 
@@ -226,6 +237,7 @@ if score > 0 {
 ```
 
 This is emitted as an Erlang `case` on the condition.
+When mutable `var` bindings are reassigned inside branches, the compiler emits a merge step after the `case` so later expressions can refer to the updated value.
 
 ## Maps and Pattern Matching
 
@@ -313,6 +325,7 @@ receive message {
 ```
 
 Compiles to an Erlang `receive ... end`.
+If mutable `var` bindings are reassigned inside `receive` bodies or nested `match` clauses, the compiler merges the final version after the control-flow expression.
 
 ## Code Generation Rules
 
@@ -320,6 +333,7 @@ Current important codegen conventions:
 
 - top-level declarations become Erlang macros
 - local identifiers become capitalized Erlang variables
+- local mutable `var` bindings become versioned Erlang variables
 - `if` becomes `case`
 - `match` becomes `case`
 - map literals become Erlang maps
@@ -344,7 +358,7 @@ Example:
 
 ## Current Limitations
 
-- `var` has no reassignment syntax yet
+- global `var` bindings are not reassignable
 - parameter type annotations are not implemented
 - there is no module/import system
 - there are no lists or tuples in Potion syntax yet
