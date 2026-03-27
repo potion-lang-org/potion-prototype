@@ -49,3 +49,35 @@ class TestSemanticAnalyzer(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             analyzer.evaluate_expression(ast.statements[1])
         self.assertIn("Erro de tipo em chamada de função 'greet'", str(ctx.exception))
+
+    def test_receive_guard_can_use_clause_bindings(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(value, caller) when value > 10 {
+                    print(value)
+                    send(caller, {ok: value})
+                }
+            }
+        }
+        """
+        ast = Parser(tokenize(code)).parse()
+        analyzer = SemanticAnalyzer()
+        value = analyzer.evaluate_expression(ast.statements[0].body[0])
+        self.assertEqual(analyzer.infer_type(value), "dynamic")
+
+    def test_receive_guard_rejects_undeclared_identifier(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(value, caller) when missing > 10 {
+                    print(value)
+                }
+            }
+        }
+        """
+        ast = Parser(tokenize(code)).parse()
+        analyzer = SemanticAnalyzer()
+        with self.assertRaises(Exception) as ctx:
+            analyzer.evaluate_expression(ast.statements[0].body[0])
+        self.assertIn("Variável 'missing' não declarada", str(ctx.exception))

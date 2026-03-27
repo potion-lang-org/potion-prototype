@@ -163,3 +163,20 @@ class TestTypeChecker(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             codegen.generate()
         self.assertIn("Erro de tipo (local) em reatribuição de 'total'", str(ctx.exception))
+
+    def test_receive_rejects_too_many_bindings_during_semantic_validation(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(value, caller, extra) {
+                    print(value)
+                }
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.visit(ast.statements[0].body[0])
+        self.assertIn("suporta no máximo 2 binding(s)", str(ctx.exception))
