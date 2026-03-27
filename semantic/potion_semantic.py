@@ -60,6 +60,8 @@ REVERSE_TYPE_MAP = {
 
 
 class SemanticAnalyzer:
+    RECEIVE_EXTRA_FIELDS = ["reply_to"]
+
     def __init__(self):
         self.local_vars = set()
         self.inside_function = False
@@ -193,6 +195,56 @@ class SemanticAnalyzer:
                     f"espera {param.type_annotation}, mas recebeu {actual_type}"
                 )
 
+    def receive_binding_placeholder(self, index):
+        if index > 0 and self.RECEIVE_EXTRA_FIELDS[index - 1] == "reply_to":
+            return PidValue()
+        return UNKNOWN
+
+    def validate_receive_block(self, node: ReceiveBlock):
+        for clause in node.clauses:
+            self.validate_receive_clause(clause)
+
+    def validate_receive_clause(self, clause):
+        if clause.is_any:
+            if clause.bindings:
+                raise Exception("Cláusula 'on any' não pode declarar bindings.")
+            if clause.guard is not None:
+                raise Exception("Cláusula 'on any' não pode ter guard.")
+        else:
+            if clause.tag is None:
+                raise Exception("Cláusula de receive sem tag.")
+            if len(clause.bindings[1:]) > len(self.RECEIVE_EXTRA_FIELDS):
+                raise Exception(
+                    f"receive on '{clause.tag}' suporta no máximo "
+                    f"{1 + len(self.RECEIVE_EXTRA_FIELDS)} binding(s) nesta etapa."
+                )
+
+        prev_inside = self.inside_function
+        prev_locals = self.local_vars.copy()
+        prev_variables = self.variables.copy()
+        prev_type_env = self.type_env.copy()
+
+        try:
+            self.inside_function = True
+            self.local_vars = prev_locals | set(clause.bindings)
+            self.variables = prev_variables.copy()
+            self.type_env = prev_type_env.copy()
+
+            for index, binding in enumerate(clause.bindings):
+                self.variables[self.emit_local_name(binding)] = self.receive_binding_placeholder(index)
+
+            if clause.guard is not None:
+                guard_value = self.evaluate_expression(clause.guard)
+                if guard_value is not UNKNOWN and not isinstance(guard_value, bool):
+                    raise Exception("Guard de receive deve resultar em bool.")
+
+            self.evaluate_block(clause.body)
+        finally:
+            self.inside_function = prev_inside
+            self.local_vars = prev_locals
+            self.variables = prev_variables
+            self.type_env = prev_type_env
+
     def evaluate_expression(self, node):
         if isinstance(node, LiteralInt):
             return node.value
@@ -295,7 +347,10 @@ class SemanticAnalyzer:
             self.type_env = old_type_env
             return result
 
-        if isinstance(node, (SendExpression, ReceiveBlock, MatchExpression, MapLiteral)):
+        if isinstance(node, ReceiveBlock):
+            self.validate_receive_block(node)
+            return DynamicValue()
+        if isinstance(node, (SendExpression, MatchExpression, MapLiteral)):
             return DynamicValue()
         if isinstance(node, SpawnExpression):
             return PidValue()

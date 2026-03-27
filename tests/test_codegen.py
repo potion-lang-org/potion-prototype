@@ -217,3 +217,20 @@ class TestCodegen(unittest.TestCase):
         self.assertIn("#{data := Payload, reply_to := Caller} ->", erlang_code)
         self.assertIn("maps:get(nome, Payload)", erlang_code)
         self.assertIn("maps:get(idade, Payload)", erlang_code)
+
+    def test_receive_rejects_too_many_bindings_for_current_convention(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(value, caller, extra) {
+                    print(value)
+                }
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("suporta no máximo 2 binding(s)", str(ctx.exception))
