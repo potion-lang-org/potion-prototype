@@ -23,3 +23,11 @@ class TestLexer(unittest.TestCase):
         tokens = tokenize("import helpers")
         self.assertEqual(tokens[0], ("IMPORT", "import"))
         self.assertEqual(tokens[1], ("ID", "helpers"))
+
+    def test_receive_clause_tokens(self):
+        tokens = tokenize("receive { on data(value, caller) when value > 10 { print(value) } on any { print(\"ignored\") } }")
+        token_types = [kind for kind, _ in tokens]
+        self.assertIn("RECEIVE", token_types)
+        self.assertIn("ON", token_types)
+        self.assertIn("WHEN", token_types)
+        self.assertIn("ANY", token_types)

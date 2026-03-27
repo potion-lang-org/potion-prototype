@@ -12,13 +12,14 @@ fn make_user(total) {
 }
 
 fn worker() {
-    receive payload {
-        match payload {
-            {customer: customer, reply_to: caller} => {
-                print("Processing customer")
-                send(caller, {result: customer})
-            }
-            _ => send(self(), {result: {name: "invalid", total: 0}})
+    receive {
+        on customer(customer, caller) {
+            print("Processing customer")
+            send(caller, {result: customer})
+        }
+
+        on any {
+            send(self(), {result: {name: "invalid", total: 0}})
         }
     }
 }
@@ -35,13 +36,16 @@ fn main() {
 
     send(pid, {customer: customer, reply_to: self()})
 
-    receive response {
-        match response {
-            {result: data} => match data {
+    receive {
+        on result(data) {
+            match data {
                 {name: who, total: total} => print("Done")
                 _ => print("Bad payload")
             }
-            _ => print("No response")
+        }
+
+        on any {
+            print("No response")
         }
     }
 }

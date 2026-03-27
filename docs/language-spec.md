@@ -363,11 +363,11 @@ If the sender expects a response, the common pattern is to include its own pid i
 send(worker_pid, {hello: "Bruce", reply_to: self()})
 ```
 
-The receiver can then bind that pid in a map pattern and reply explicitly:
+Inside `receive`, the receiver can bind that pid positionally through `on <tag>(...)` and reply explicitly:
 
 ```potion
-match message {
-    {hello: name, reply_to: caller} => {
+receive {
+    on hello(name, caller) {
         send(caller, {ok: "received"})
     }
 }
@@ -377,21 +377,44 @@ Notes:
 
 - `self()` returns the pid of the current process
 - `reply_to` is not a reserved keyword; it is a conventional map key
-- `caller` is not a reserved keyword; it is just the local binding name used in the pattern
+- `caller` is not a reserved keyword; it is just the local binding name used in the receive clause
 - this is a message protocol convention built on top of `send`, not a special reply feature of the language
 
 ### `receive`
 
 ```potion
-receive message {
-    match message {
-        {ok: text} => print(text)
+receive {
+    on ok(text) {
+        print(text)
+    }
+
+    on any {
+        print("unexpected")
     }
 }
 ```
 
 Compiles to an Erlang `receive ... end`.
+Inside `receive`, `on <tag>(arg1, arg2, ...)` is sugar for map pattern matching.
+The first binding maps to the main payload under `<tag>`, and the following bindings map to extra fields by fixed convention.
+Today, the first extra field is `reply_to`.
+`on any` compiles to the fallback `_` clause.
+Optional `when` expressions compile to Erlang guards.
 If mutable `var` bindings are reassigned inside `receive` bodies or nested `match` clauses, the compiler merges the final version after the control-flow expression.
+
+Example:
+
+```potion
+receive {
+    on data(value, caller) when value > 10 {
+        print(value)
+    }
+
+    on any {
+        print("ignored")
+    }
+}
+```
 
 ## Code Generation Rules
 

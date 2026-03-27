@@ -153,3 +153,67 @@ class TestCodegen(unittest.TestCase):
         self.assertIn("Total_2 = case #{ok => 2} of", erlang_code)
         self.assertIn("Total_1 = Value", erlang_code)
         self.assertIn("Total_1 = 0", erlang_code)
+
+    def test_receive_on_codegen(self):
+        code = """
+        fn worker() {
+            receive {
+                on hello(name, caller) {
+                    print("Hello, " + name)
+                    send(caller, {ok: "received"})
+                }
+
+                on any {
+                    print("unexpected message")
+                }
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("receive", erlang_code)
+        self.assertIn("#{hello := Name, reply_to := Caller} ->", erlang_code)
+        self.assertIn('Caller ! #{ok => "received"}', erlang_code)
+        self.assertIn('_ ->', erlang_code)
+
+    def test_receive_on_with_guard_codegen(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(value, caller) when value > 10 {
+                    print(value)
+                }
+
+                on any {
+                    print("ignored")
+                }
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("#{data := Value, reply_to := Caller} when (Value > 10) ->", erlang_code)
+        self.assertIn('io:format("~p~n", [Value])', erlang_code)
+
+    def test_receive_on_complex_payload_codegen(self):
+        code = """
+        fn worker() {
+            receive {
+                on data(payload, caller) {
+                    print(payload.nome)
+                    print(payload.idade)
+                }
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("#{data := Payload, reply_to := Caller} ->", erlang_code)
+        self.assertIn("maps:get(nome, Payload)", erlang_code)
+        self.assertIn("maps:get(idade, Payload)", erlang_code)
