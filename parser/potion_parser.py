@@ -71,10 +71,24 @@ class MatchExpression(ASTNode):
         self.value = value
         self.clauses = clauses
 
-class ReceiveBlock(ASTNode):
-    def __init__(self, var_name: str, body: List[ASTNode]):
-        self.var_name = var_name
+class ReceiveClause(ASTNode):
+    def __init__(
+        self,
+        tag: Optional[str],
+        bindings: List[str],
+        guard: Optional[ASTNode],
+        body: List[ASTNode],
+        is_any: bool = False,
+    ):
+        self.tag = tag
+        self.bindings = bindings
+        self.guard = guard
         self.body = body
+        self.is_any = is_any
+
+class ReceiveBlock(ASTNode):
+    def __init__(self, clauses: List[ReceiveClause]):
+        self.clauses = clauses
 
 class PrintCall(ASTNode):
     def __init__(self, value: ASTNode):
@@ -98,6 +112,11 @@ class LiteralNone(ASTNode):
 class Identifier(ASTNode):
     def __init__(self, name):
         self.name = name
+
+class MemberAccess(ASTNode):
+    def __init__(self, target: ASTNode, field: str):
+        self.target = target
+        self.field = field
 
 class BinaryOp(ASTNode):
     def __init__(self, left: ASTNode, op: str, right: ASTNode):
@@ -288,18 +307,50 @@ class Parser:
 
     def receive_block(self) -> ReceiveBlock:
         self.eat("RECEIVE")
-        var_name = self.eat("ID")[1]
         self.eat("LBRACE")
-        body = []
+        clauses = []
         while self.current()[0] != "RBRACE":
-            if self.current()[0] == "MATCH":
-                body.append(self.match_expression())
-            else:
+            clauses.append(self.receive_clause())
+        self.eat("RBRACE")
+        return ReceiveBlock(clauses)
+
+    def receive_clause(self) -> ReceiveClause:
+        self.eat("ON")
+
+        if self.current()[0] == "ANY":
+            self.eat("ANY")
+            self.eat("LBRACE")
+            body = []
+            while self.current()[0] != "RBRACE":
                 stmt = self.statement()
                 if stmt:
                     body.append(stmt)
+            self.eat("RBRACE")
+            return ReceiveClause(tag=None, bindings=[], guard=None, body=body, is_any=True)
+
+        tag = self.eat("ID")[1]
+        self.eat("LPAREN")
+        bindings = []
+        if self.current()[0] != "RPAREN":
+            bindings.append(self.eat("ID")[1])
+            while self.current()[0] == "COMMA":
+                self.eat("COMMA")
+                bindings.append(self.eat("ID")[1])
+        self.eat("RPAREN")
+
+        guard = None
+        if self.current()[0] == "WHEN":
+            self.eat("WHEN")
+            guard = self.expression()
+
+        self.eat("LBRACE")
+        body = []
+        while self.current()[0] != "RBRACE":
+            stmt = self.statement()
+            if stmt:
+                body.append(stmt)
         self.eat("RBRACE")
-        return ReceiveBlock(var_name, body)
+        return ReceiveClause(tag=tag, bindings=bindings, guard=guard, body=body)
 
 
     def match_expression(self) -> MatchExpression:
@@ -353,7 +404,12 @@ class Parser:
         return node
 
     def factor(self) -> ASTNode:
-        return self.primary()
+        node = self.primary()
+        while self.current()[0] == "DOT":
+            self.eat("DOT")
+            field = self.eat("ID")[1]
+            node = MemberAccess(node, field)
+        return node
     
     def primary(self) -> ASTNode:
         tok_type, tok_value = self.current()

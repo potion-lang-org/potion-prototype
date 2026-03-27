@@ -162,12 +162,14 @@ describe(Person) ->
 ### Concurrency (`sp`, `send`, `receive`, `match`)
 ```potion
 fn worker() {
-    receive msg {
-        match msg {
-            {hello: name, reply_to: caller} => {
-                print("Hi, " + name)
-                send(caller, {ok: "Message received"})
-            }
+    receive {
+        on hello(name, caller) {
+            print("Hi, " + name)
+            send(caller, {ok: "Message received"})
+        }
+
+        on any {
+            print("Unexpected message")
         }
     }
 }
@@ -176,10 +178,13 @@ fn main() {
     val pid = sp worker()
     send(pid, {hello: "Bruce", reply_to: self()})
 
-    receive response {
-        match response {
-            {ok: text} => print(text)
-            _ => print("No reply")
+    receive {
+        on ok(text) {
+            print(text)
+        }
+
+        on any {
+            print("No reply")
         }
     }
 }
@@ -188,24 +193,22 @@ fn main() {
 → Erlang:
 ```erlang
 worker() ->
-    receive Msg ->
-        case Msg of
-            #{hello := Name, reply_to := Caller} ->
-                io:format("~p~n", ["Hi, " ++ Name]),
-                Caller ! #{ok => "Message received"}
-        end
+    receive
+        #{hello := Name, reply_to := Caller} ->
+            io:format("~p~n", ["Hi, " ++ Name]),
+            Caller ! #{ok => "Message received"};
+        _ ->
+            io:format("~p~n", ["Unexpected message"])
     end.
 
 main() ->
     Pid = spawn(fun () -> worker() end),
     Pid ! #{hello => "Bruce", reply_to => self()},
-    receive Response ->
-        case Response of
-            #{ok := Text} ->
-                io:format("~p~n", [Text]);
-            _ ->
-                io:format("~p~n", ["No reply"])
-        end
+    receive
+        #{ok := Text} ->
+            io:format("~p~n", [Text]);
+        _ ->
+            io:format("~p~n", ["No reply"])
     end.
 ```
 
@@ -247,6 +250,16 @@ fn main() {
         print("ok")
     } else {
         print("not ok")
+    }
+
+    receive {
+        on ok(message) {
+            print(message)
+        }
+
+        on any {
+            print("ignored")
+        }
     }
 }
 ```
@@ -354,12 +367,14 @@ pip install -e .
 val base: int = 10
 
 fn worker() {
-    receive msg {
-        match msg {
-            {compute: value, reply_to: caller} => {
-                val doubled = value * 2
-                send(caller, {result: doubled + base})
-            }
+    receive {
+        on compute(value, caller) {
+            val doubled = value * 2
+            send(caller, {result: doubled + base})
+        }
+
+        on any {
+            print("unexpected")
         }
     }
 }
@@ -368,9 +383,13 @@ fn main() {
     val pid = sp worker()
     send(pid, {compute: 5, reply_to: self()})
 
-    receive response {
-        match response {
-            {result: total} => print("Result: " + to_string(total))
+    receive {
+        on result(total) {
+            print("Result: " + to_string(total))
+        }
+
+        on any {
+            print("No reply")
         }
     }
 }

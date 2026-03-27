@@ -8,6 +8,8 @@ RESERVED_WORDS = {
 }
 
 class ErlangCodegen(SemanticAnalyzer):
+    RECEIVE_EXTRA_FIELDS = ["reply_to"]
+
     def __init__(self, ast, module_name="module_name", external_functions=None):
         super().__init__()
         self.ast = ast
@@ -235,22 +237,23 @@ class ErlangCodegen(SemanticAnalyzer):
         return f"#{{{inner}}}"
 
     def visit_ReceiveBlock(self, node: ReceiveBlock):
-        binding_name = self.emit_local_name(node.var_name)
-        prev_inside = self.inside_function
-        prev_locals = self.local_vars.copy()
-        merge_vars = self.collect_assigned_mutables(node.body)
+        merge_vars = self.collect_assigned_mutables(
+            [stmt for clause in node.clauses for stmt in clause.body]
+        )
         start_versions = self.var_versions.copy()
-        self.inside_function = True
-        self.local_vars = prev_locals | {node.var_name}
-        body_code, end_versions = self.emit_branch_body(node.body, merge_vars, start_versions)
+        clauses_code = []
+        branch_versions = []
+        for idx, clause in enumerate(node.clauses):
+            clause_code, end_versions = self.generate_receive_clause(clause, merge_vars, start_versions)
+            if idx < len(node.clauses) - 1:
+                clause_code += ";"
+            clauses_code.append(clause_code)
+            branch_versions.append(end_versions)
 
-        self.inside_function = prev_inside
-        self.local_vars = prev_locals
+        clauses_block = "\n".join(clauses_code) if clauses_code else "    _ ->\n        ok"
         self.var_versions = start_versions
-
-        inner = self.format_with_indent(body_code, "        ")
-        receive_code = f"receive {binding_name} ->\n{inner}\n    end"
-        return self.wrap_control_flow_with_merge(receive_code, merge_vars, [end_versions])
+        receive_code = f"receive\n{clauses_block}\nend"
+        return self.wrap_control_flow_with_merge(receive_code, merge_vars, branch_versions)
 
     def visit_MatchExpression(self, node: MatchExpression):
         value_code = self.visit(node.value)
@@ -285,6 +288,21 @@ class ErlangCodegen(SemanticAnalyzer):
         formatted_body = self.format_with_indent(clause_body, "        ")
         return f"    {pattern_code} ->\n{formatted_body}", end_versions
 
+    def generate_receive_clause(self, clause: ReceiveClause, merge_vars, start_versions):
+        self.var_versions = start_versions.copy()
+        pattern_code = self.emit_receive_pattern(clause)
+        prev_locals = self.local_vars.copy()
+        self.local_vars |= set(clause.bindings)
+        guard_code = ""
+        if clause.guard is not None:
+            guard_code = f" when {self.visit(clause.guard)}"
+        clause_body, end_versions = self.emit_branch_body(clause.body, merge_vars, start_versions)
+
+        self.local_vars = prev_locals
+
+        formatted_body = self.format_with_indent(clause_body, "        ")
+        return f"    {pattern_code}{guard_code} ->\n{formatted_body}", end_versions
+
     def collect_pattern_bindings(self, pattern):
         bindings = set()
         if isinstance(pattern, Identifier):
@@ -313,6 +331,28 @@ class ErlangCodegen(SemanticAnalyzer):
         if isinstance(pattern, MapLiteral):
             return self.emit_pattern_map(pattern)
         return self.visit(pattern)
+
+    def emit_receive_pattern(self, clause: ReceiveClause):
+        if clause.is_any:
+            return "_"
+
+        entries = []
+        if clause.bindings:
+            entries.append((clause.tag, Identifier(clause.bindings[0])))
+        else:
+            entries.append((clause.tag, Identifier("_")))
+
+        extra_bindings = clause.bindings[1:]
+        if len(extra_bindings) > len(self.RECEIVE_EXTRA_FIELDS):
+            raise Exception(
+                f"receive on '{clause.tag}' suporta no máximo "
+                f"{1 + len(self.RECEIVE_EXTRA_FIELDS)} binding(s) nesta etapa."
+            )
+
+        for key, binding in zip(self.RECEIVE_EXTRA_FIELDS, extra_bindings):
+            entries.append((key, Identifier(binding)))
+
+        return self.emit_pattern_map(MapLiteral(entries))
 
     def emit_pattern_map(self, map_node: MapLiteral):
         if not map_node.entries:
@@ -345,6 +385,11 @@ class ErlangCodegen(SemanticAnalyzer):
         if node.name in RESERVED_WORDS:
             return RESERVED_WORDS[node.name]
         return self.emit_name(node.name)
+
+    def visit_MemberAccess(self, node):
+        target_code = self.visit(node.target)
+        key_code = self.emit_map_key(node.field)
+        return f"maps:get({key_code}, {target_code})"
 
     def visit_BinaryOp(self, node):
         if node.op == "+" and (self.is_string_expression(node.left) or self.is_string_expression(node.right)):
@@ -428,7 +473,8 @@ class ErlangCodegen(SemanticAnalyzer):
                 for clause in stmt.clauses:
                     assigned.extend(self.collect_assigned_mutables(clause.body))
             elif isinstance(stmt, ReceiveBlock):
-                assigned.extend(self.collect_assigned_mutables(stmt.body))
+                for clause in stmt.clauses:
+                    assigned.extend(self.collect_assigned_mutables(clause.body))
         return list(dict.fromkeys(assigned))
 
     def emit_merge_return_expr(self, merge_vars):

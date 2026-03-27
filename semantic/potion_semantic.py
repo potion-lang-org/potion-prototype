@@ -12,6 +12,7 @@ from parser.potion_parser import (
     LiteralStr,
     MapLiteral,
     MatchExpression,
+    MemberAccess,
     PrintCall,
     ReceiveBlock,
     ReturnStatement,
@@ -241,6 +242,13 @@ class SemanticAnalyzer:
                     return UNKNOWN
                 raise Exception(f"Variável '{node.name}' não declarada.")
             return self.variables[var_name]
+        if isinstance(node, MemberAccess):
+            target = self.evaluate_expression(node.target)
+            if target is UNKNOWN or isinstance(target, DynamicValue):
+                return UNKNOWN
+            if isinstance(target, dict):
+                return target.get(node.field, UNKNOWN)
+            return UNKNOWN
         if isinstance(node, FunctionCall):
             func_name = node.name
             args = [self.evaluate_expression(arg) for arg in node.args]
@@ -326,7 +334,7 @@ class SemanticAnalyzer:
             return self.evaluate_expression(stmt)
         if isinstance(stmt, ImportStatement):
             return DynamicValue()
-        if isinstance(stmt, (FunctionCall, BinaryOp, Identifier)):
+        if isinstance(stmt, (FunctionCall, BinaryOp, Identifier, MemberAccess)):
             return self.evaluate_expression(stmt)
         return DynamicValue()
 

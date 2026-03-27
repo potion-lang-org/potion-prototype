@@ -6,6 +6,7 @@ from parser.potion_parser import (
     LiteralInt,
     LiteralNone,
     Parser,
+    ReceiveBlock,
     ValDeclaration,
     VarDeclaration,
     tokenize,
@@ -62,3 +63,43 @@ class TestParser(unittest.TestCase):
         ast = parser.parse()
         self.assertIsInstance(ast.statements[0], ImportStatement)
         self.assertEqual(ast.statements[0].module_name, "helpers")
+
+    def test_receive_on_clause_parsing(self):
+        tokens = tokenize("""
+        fn worker() {
+            receive {
+                on hello(name, caller) {
+                    print(name)
+                }
+
+                on any {
+                    print("unexpected")
+                }
+            }
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        receive_block = ast.statements[0].body[0]
+        self.assertIsInstance(receive_block, ReceiveBlock)
+        self.assertEqual(len(receive_block.clauses), 2)
+        self.assertEqual(receive_block.clauses[0].tag, "hello")
+        self.assertEqual(receive_block.clauses[0].bindings, ["name", "caller"])
+        self.assertTrue(receive_block.clauses[1].is_any)
+
+    def test_receive_on_clause_with_guard_parsing(self):
+        tokens = tokenize("""
+        fn worker() {
+            receive {
+                on data(value, caller) when value > 10 {
+                    print(value)
+                }
+            }
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        clause = ast.statements[0].body[0].clauses[0]
+        self.assertEqual(clause.tag, "data")
+        self.assertEqual(clause.bindings, ["value", "caller"])
+        self.assertIsNotNone(clause.guard)

@@ -363,11 +363,11 @@ Se o emissor espera uma resposta, o padrão comum é incluir o próprio pid dent
 send(worker_pid, {hello: "Bruce", reply_to: self()})
 ```
 
-O receptor então pode fazer binding desse pid em um pattern de mapa e responder explicitamente:
+Dentro de `receive`, o receptor pode fazer binding posicional desse pid com `on <tag>(...)` e responder explicitamente:
 
 ```potion
-match message {
-    {hello: name, reply_to: caller} => {
+receive {
+    on hello(name, caller) {
         send(caller, {ok: "received"})
     }
 }
@@ -377,21 +377,44 @@ Observações:
 
 - `self()` retorna o pid do processo atual
 - `reply_to` não é palavra reservada; é apenas uma chave de mapa por convenção
-- `caller` não é palavra reservada; é apenas o nome local usado no pattern
+- `caller` não é palavra reservada; é apenas o nome local usado na cláusula de receive
 - isso é uma convenção de protocolo de mensagens construída sobre `send`, não uma feature especial de resposta da linguagem
 
 ### `receive`
 
 ```potion
-receive message {
-    match message {
-        {ok: text} => print(text)
+receive {
+    on ok(text) {
+        print(text)
+    }
+
+    on any {
+        print("unexpected")
     }
 }
 ```
 
 Compila para `receive ... end` em Erlang.
+Dentro de `receive`, `on <tag>(arg1, arg2, ...)` é açúcar sintático para pattern matching sobre mapas.
+O primeiro binding corresponde ao payload principal em `<tag>`, e os bindings seguintes correspondem aos campos extras por convenção fixa.
+Hoje, o primeiro campo extra é `reply_to`.
+`on any` compila para a cláusula coringa `_`.
+Expressões opcionais com `when` viram guards Erlang.
 Se `var` mutáveis forem reatribuídas dentro do corpo de `receive` ou de `match` aninhados, o compilador faz merge da versão final após a expressão de controle de fluxo.
+
+Exemplo:
+
+```potion
+receive {
+    on data(value, caller) when value > 10 {
+        print(value)
+    }
+
+    on any {
+        print("ignored")
+    }
+}
+```
 
 ## Regras de Geração de Código
 
