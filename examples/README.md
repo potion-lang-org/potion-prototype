@@ -17,4 +17,6 @@ Files:
 - `11_typed_params_with_match.potion` - typed function parameters used together with `match` and `to_string(...)`.
 - `12_type_error_typed_function_call.potion` - intentionally invalid example showing compile-time rejection of a function call with the wrong argument type.
 - `13_modules_and_imports_main.potion` - entry module importing helper functions from another `.potion` file in the same directory.
+- `14_erlang_module_interop.potion` - generic interop with Erlang modules via `import erlang <module>` and `<module>.<function>(...)`.
+- `15_erlang_httpc_interop.potion` - HTTP example using Erlang `inets` and `httpc` through the generic interop syntax.
 - `module_helpers.potion` - helper module used by `13_modules_and_imports_main.potion`.

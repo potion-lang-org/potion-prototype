@@ -33,8 +33,9 @@ Its goal is to make writing business logic clear and safe, producing efficient c
 - Function parameters with optional type hints (`fn greet(name: str, age: int) { ... }`).
 - Local reassignment for `var` with syntax like `current = next_value`.
 - Module imports between `.potion` files with `import module_name`.
+- Generic Erlang module imports with `import erlang module_name`.
 - Functions with parameters, local bindings, and explicit `return`.
-- Literals for integers, strings, booleans, maps, and `none`.
+- Literals for integers, strings, booleans, maps, lists, and `none`.
 - Arithmetic (`+`, `-`, `*`, `/`) and comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`).
 - String concatenation with `+`, emitted as `++` in Erlang.
 - `if` / `else` conditionals compiled to Erlang `case` expressions.
@@ -92,6 +93,23 @@ fn main() {
 
 Potion resolves `import module_helpers` to `module_helpers.potion` in the same directory as the importing file.
 Imported function calls are written without qualification in Potion and emitted as remote Erlang calls internally.
+
+Potion also supports generic Erlang interop:
+
+```potion
+import erlang math
+import erlang lists
+
+fn main() {
+    val root = math.sqrt(16)
+    val reversed = lists.reverse([1, 2, 3])
+    print(root)
+    print(reversed)
+}
+```
+
+This compiles calls such as `math.sqrt(...)` and `lists.reverse(...)` to `math:sqrt(...)` and `lists:reverse(...)`.
+In V1, Potion only checks that the Erlang module was imported before use; it does not validate function existence or arity.
 
 ### Types and `none`
 ```potion
@@ -158,6 +176,20 @@ describe(Person) ->
 ```
 
 > 🔒 Keys must currently be bare identifiers (emitted as atoms) and values can nest other maps or identifiers.
+
+### Lists
+```potion
+val numbers = [1, 2, 3]
+print(numbers)
+```
+
+→ Erlang:
+```erlang
+Numbers = [1, 2, 3],
+io:format("~p~n", [Numbers]).
+```
+
+Lists are especially useful when interoperating with Erlang modules such as `lists`.
 
 ### Concurrency (`sp`, `send`, `receive`, `match`)
 ```potion
@@ -233,6 +265,24 @@ Use `to_string(...)` explicitly when you want textual concatenation:
 ```potion
 val message = "Age: " + to_string(age)
 ```
+
+### Erlang HTTP Interop
+```potion
+import erlang ssl
+import erlang inets
+import erlang httpc
+
+fn main() {
+    ssl.start()
+    inets.start()
+
+    val response = httpc.request("https://example.com")
+    print(response)
+}
+```
+
+This compiles to remote Erlang calls such as `ssl:start()`, `inets:start()`, and `httpc:request(...)`.
+For HTTPS requests, `ssl.start()` must run before `httpc.request(...)`.
 
 For a full list of reserved keywords, builtins, types, and syntax rules, see [`docs/language-spec.md`](./docs/language-spec.md).
 
@@ -357,7 +407,10 @@ pip install -e .
 - Map keys must be bare identifiers and are emitted as Erlang atoms.
 - `var` is intended for function-local mutable state, not module-level mutable state.
 - Type checking is intentionally lightweight and still incomplete compared to a full standalone type system.
-- Imports currently resolve only to sibling `.potion` files and expose imported functions, not imported global values.
+- Imported `.potion` modules currently expose only functions, not imported global values.
+- Erlang interop currently supports only `import erlang <module>` and `<module>.<function>(...)`.
+- Erlang interop does not validate module existence, function existence, or arity.
+- Potion still has no atom literal syntax, so some Erlang APIs are callable but not fully ergonomic yet.
 
 ---
 

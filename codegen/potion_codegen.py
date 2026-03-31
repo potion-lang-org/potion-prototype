@@ -39,6 +39,10 @@ class ErlangCodegen(SemanticAnalyzer):
     def collect_function_names_and_globals(self, node):
         if hasattr(node, "statements"):
             for stmt in node.statements:
+                if isinstance(stmt, ErlangImportStatement):
+                    self.register_erlang_import(stmt.module_name)
+
+            for stmt in node.statements:
                 if isinstance(stmt, FunctionDef):
                     self.function_names.append(stmt.name)
                     self.function_arities[stmt.name] = len(stmt.params)  
@@ -69,7 +73,7 @@ class ErlangCodegen(SemanticAnalyzer):
 
     def visit_Program(self, node):
         for stmt in node.statements:
-            if not isinstance(stmt, (ImportStatement, ValDeclaration, VarDeclaration)):  # Globais já tratadas
+            if not isinstance(stmt, (ImportStatement, ErlangImportStatement, ValDeclaration, VarDeclaration)):  # Globais já tratadas
                 self.visit(stmt)
 
     def visit_ValDeclaration(self, node):
@@ -213,7 +217,16 @@ class ErlangCodegen(SemanticAnalyzer):
         args_code = [self.visit(arg) for arg in node.args]
         return f"{node.name}({', '.join(args_code)})"
 
+    def visit_ExternalModuleCall(self, node: ExternalModuleCall):
+        self.validate_erlang_module_imported(node.module_name)
+        args_code = [self.visit(arg) for arg in node.args]
+        return f"{node.module_name}:{node.function_name}({', '.join(args_code)})"
+
     def visit_ImportStatement(self, node):
+        return None
+
+    def visit_ErlangImportStatement(self, node):
+        self.register_erlang_import(node.module_name)
         return None
 
     def visit_SendExpression(self, node: SendExpression):
@@ -235,6 +248,10 @@ class ErlangCodegen(SemanticAnalyzer):
             parts.append(f"{key_code} => {value_code}")
         inner = ", ".join(parts)
         return f"#{{{inner}}}"
+
+    def visit_ListLiteral(self, node: ListLiteral):
+        elements = ", ".join(self.visit(element) for element in node.elements)
+        return f"[{elements}]"
 
     def visit_ReceiveBlock(self, node: ReceiveBlock):
         merge_vars = self.collect_assigned_mutables(

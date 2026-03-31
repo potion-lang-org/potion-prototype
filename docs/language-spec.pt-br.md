@@ -26,10 +26,14 @@ O lexer reserva atualmente estas palavras-chave:
 - `val`
 - `var`
 - `import`
+- `erlang`
 - `fn`
 - `sp`
 - `send`
 - `receive`
+- `on`
+- `when`
+- `any`
 - `match`
 - `none`
 - `if`
@@ -69,6 +73,7 @@ Literais suportados:
 - booleanos: `true`, `false`
 - `none`
 - mapas, por exemplo `{name: "Bruce", age: 42}`
+- listas, por exemplo `[1, 2, 3]`
 
 Limites atuais:
 
@@ -163,6 +168,12 @@ Sintaxe de import:
 import module_helpers
 ```
 
+Sintaxe de import de módulo Erlang externo:
+
+```potion
+import erlang httpc
+```
+
 Regras atuais:
 
 - `import nome_do_modulo` resolve para `nome_do_modulo.potion`
@@ -170,6 +181,10 @@ Regras atuais:
 - funções importadas podem ser chamadas diretamente pelo nome no código Potion
 - chamadas importadas são emitidas como chamadas remotas Erlang, como `module_helpers:greet(...)`
 - funções locais têm precedência sobre funções importadas com o mesmo nome e aridade
+- `import erlang nome_do_modulo` registra um módulo Erlang externo para o arquivo atual
+- chamadas externas Erlang usam o formato `modulo.funcao(...)`
+- chamadas externas Erlang são emitidas como `modulo:funcao(...)`
+- a análise semântica só verifica se o módulo Erlang foi importado antes do uso
 
 Limites atuais:
 
@@ -177,6 +192,7 @@ Limites atuais:
 - bindings `val` no topo do módulo importado não são expostos
 - não há sintaxe de alias nem de import seletivo
 - caminhos de módulo em diretórios aninhados ainda não existem
+- o interop Erlang externo não valida existência de função nem aridade
 
 ## Expressões
 
@@ -184,9 +200,11 @@ Formas de expressão suportadas:
 
 - identificadores
 - chamadas de função
+- chamadas de módulo externo no formato `modulo.funcao(...)`
 - aritmética
 - comparações
 - mapas
+- listas
 - blocos `if`
 - blocos `match`
 - blocos `receive`
@@ -313,6 +331,12 @@ Quando `var` mutáveis são reatribuídas dentro de ramos, o compilador emite um
 val person = {name: "Bruce", age: 42}
 ```
 
+### Literais de lista
+
+```potion
+val numbers = [1, 2, 3]
+```
+
 ### `match`
 
 ```potion
@@ -426,9 +450,11 @@ Convenções importantes atuais do codegen:
 - `if` vira `case`
 - `match` vira `case`
 - mapas viram maps Erlang
+- listas viram listas Erlang
 - padrões de mapa usam `:=`
 - concatenação de string usa `++`
 - `print(...)` emite `io:format("~p~n", [...])`
+- chamadas de módulo externo viram `modulo:funcao(...)`
 
 ## Regras de Nomeação da CLI
 
@@ -449,8 +475,11 @@ Exemplo:
 
 - estado mutável no nível de módulo não faz parte da linguagem
 - anotações de tipo em parâmetros são opcionais, mas anotações de tipo de retorno ainda não existem
-- imports são limitados a arquivos `.potion` irmãos e funções importadas
-- ainda não existem listas nem tuplas na sintaxe Potion
+- imports entre arquivos `.potion` são limitados a módulos irmãos e funções importadas
+- o interop Erlang é limitado a `import erlang <modulo>` e `<modulo>.<funcao>(...)`
+- o interop Erlang não valida existência do módulo, da função nem da aridade
+- ainda não existe sintaxe de tupla
+- ainda não existe sintaxe de átomo
 - a checagem de tipos é leve e ainda está acoplada à geração de código
 - concatenação de strings depende de o compilador reconhecer a expressão como produtora de string
 - não há geração direta de BEAM; Potion gera Erlang primeiro

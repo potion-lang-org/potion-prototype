@@ -26,10 +26,14 @@ The lexer currently reserves these keywords:
 - `val`
 - `var`
 - `import`
+- `erlang`
 - `fn`
 - `sp`
 - `send`
 - `receive`
+- `on`
+- `when`
+- `any`
 - `match`
 - `none`
 - `if`
@@ -69,6 +73,7 @@ Supported literals:
 - boolean literals: `true`, `false`
 - `none`
 - map literals, for example `{name: "Bruce", age: 42}`
+- list literals, for example `[1, 2, 3]`
 
 Current limitations:
 
@@ -163,6 +168,12 @@ Import syntax:
 import module_helpers
 ```
 
+External Erlang module import syntax:
+
+```potion
+import erlang httpc
+```
+
 Current rules:
 
 - `import module_name` resolves to `module_name.potion`
@@ -170,6 +181,10 @@ Current rules:
 - imported functions can be called directly by name in Potion source
 - imported calls are emitted as remote Erlang calls such as `module_helpers:greet(...)`
 - local functions take precedence over imported functions with the same name and arity
+- `import erlang module_name` registers an external Erlang module for the current file
+- external Erlang calls use the form `module_name.function_name(...)`
+- external Erlang calls are emitted as `module_name:function_name(...)`
+- the semantic analyzer only checks whether the Erlang module was imported before use
 
 Current limitations:
 
@@ -177,6 +192,7 @@ Current limitations:
 - imported top-level `val` bindings are not exposed
 - there is no alias syntax and no selective import syntax
 - nested directory module paths are not implemented
+- external Erlang interop does not validate function existence or arity
 
 ## Expressions
 
@@ -184,9 +200,11 @@ Supported expression forms:
 
 - identifiers
 - function calls
+- external module calls in the form `module.function(...)`
 - arithmetic
 - comparisons
 - map literals
+- list literals
 - `if` blocks
 - `match` blocks
 - `receive` blocks
@@ -313,6 +331,12 @@ When mutable `var` bindings are reassigned inside branches, the compiler emits a
 val person = {name: "Bruce", age: 42}
 ```
 
+### List literals
+
+```potion
+val numbers = [1, 2, 3]
+```
+
 ### `match`
 
 ```potion
@@ -426,9 +450,11 @@ Current important codegen conventions:
 - `if` becomes `case`
 - `match` becomes `case`
 - map literals become Erlang maps
+- list literals become Erlang lists
 - map patterns use `:=`
 - string concatenation uses `++`
 - `print(...)` emits `io:format("~p~n", [...])`
+- external module calls become `module:function(...)`
 
 ## CLI Naming Rules
 
@@ -449,9 +475,11 @@ Example:
 
 - module-level mutable state is not part of the language
 - parameter type annotations are optional, but return type annotations are not implemented
-- there is no module/import system
-- imports are limited to sibling `.potion` files and imported functions
-- there are no lists or tuples in Potion syntax yet
+- imports across `.potion` files are limited to sibling modules and imported functions
+- Erlang interop is limited to `import erlang <module>` and `<module>.<function>(...)`
+- Erlang interop does not validate module existence, function existence, or arity
+- there is no tuple syntax yet
+- there is no atom literal syntax yet
 - type checking is lightweight and still tied to code generation
 - string concatenation depends on the compiler recognizing the expression as string-producing
 - there is no direct BEAM generation; Potion generates Erlang first

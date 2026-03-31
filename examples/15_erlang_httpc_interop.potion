@@ -1,0 +1,11 @@
+import erlang inets
+import erlang httpc
+import erlang ssl
+
+fn main() {
+    ssl.start()
+    inets.start()
+
+    val response = httpc.request("https://datatrail.com.br")
+    print(response)
+}
