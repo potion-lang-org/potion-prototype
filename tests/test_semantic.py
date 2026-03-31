@@ -81,3 +81,29 @@ class TestSemanticAnalyzer(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             analyzer.evaluate_expression(ast.statements[0].body[0])
         self.assertIn("Variável 'missing' não declarada", str(ctx.exception))
+
+    def test_external_erlang_module_call_requires_import(self):
+        code = """
+        fn main() {
+            val response = httpc.request("https://example.com")
+        }
+        """
+        ast = Parser(tokenize(code)).parse()
+        analyzer = SemanticAnalyzer()
+        with self.assertRaises(Exception) as ctx:
+            analyzer.evaluate_statement(ast.statements[0].body[0])
+        self.assertIn("Módulo Erlang 'httpc' não foi importado", str(ctx.exception))
+
+    def test_external_erlang_module_call_accepts_imported_module(self):
+        code = """
+        import erlang httpc
+
+        fn main() {
+            val response = httpc.request("https://example.com")
+        }
+        """
+        ast = Parser(tokenize(code)).parse()
+        analyzer = SemanticAnalyzer()
+        analyzer.evaluate_statement(ast.statements[0])
+        value = analyzer.evaluate_statement(ast.statements[1].body[0])
+        self.assertEqual(analyzer.infer_type(value), "dynamic")

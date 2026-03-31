@@ -1,6 +1,8 @@
 from parser.potion_parser import (
     Assignment,
     BinaryOp,
+    ErlangImportStatement,
+    ExternalModuleCall,
     FunctionCall,
     FunctionParam,
     Identifier,
@@ -8,6 +10,7 @@ from parser.potion_parser import (
     IfBlock,
     LiteralBool,
     LiteralInt,
+    ListLiteral,
     LiteralNone,
     LiteralStr,
     MapLiteral,
@@ -74,6 +77,7 @@ class SemanticAnalyzer:
         self.mutable_vars = set()
         self.var_versions = {}
         self.external_functions = {}
+        self.imported_erlang_modules = set()
 
     def emit_local_name(self, name):
         return name.capitalize()
@@ -195,6 +199,13 @@ class SemanticAnalyzer:
                     f"espera {param.type_annotation}, mas recebeu {actual_type}"
                 )
 
+    def register_erlang_import(self, module_name):
+        self.imported_erlang_modules.add(module_name)
+
+    def validate_erlang_module_imported(self, module_name):
+        if module_name not in self.imported_erlang_modules:
+            raise Exception(f"Módulo Erlang '{module_name}' não foi importado.")
+
     def receive_binding_placeholder(self, index):
         if index > 0 and self.RECEIVE_EXTRA_FIELDS[index - 1] == "reply_to":
             return PidValue()
@@ -301,6 +312,11 @@ class SemanticAnalyzer:
             if isinstance(target, dict):
                 return target.get(node.field, UNKNOWN)
             return UNKNOWN
+        if isinstance(node, ExternalModuleCall):
+            self.validate_erlang_module_imported(node.module_name)
+            for arg in node.args:
+                self.evaluate_expression(arg)
+            return DynamicValue()
         if isinstance(node, FunctionCall):
             func_name = node.name
             args = [self.evaluate_expression(arg) for arg in node.args]
@@ -350,6 +366,10 @@ class SemanticAnalyzer:
         if isinstance(node, ReceiveBlock):
             self.validate_receive_block(node)
             return DynamicValue()
+        if isinstance(node, ListLiteral):
+            for element in node.elements:
+                self.evaluate_expression(element)
+            return DynamicValue()
         if isinstance(node, (SendExpression, MatchExpression, MapLiteral)):
             return DynamicValue()
         if isinstance(node, SpawnExpression):
@@ -378,6 +398,9 @@ class SemanticAnalyzer:
             return self.variables[self.emit_name(stmt.name)]
         if isinstance(stmt, Assignment):
             return self.variables.get(self.emit_name(stmt.name), UNKNOWN)
+        if isinstance(stmt, ErlangImportStatement):
+            self.register_erlang_import(stmt.module_name)
+            return DynamicValue()
         if isinstance(stmt, IfBlock):
             condition = self.evaluate_expression(stmt.condition)
             branch = stmt.if_body if condition else (stmt.else_body or [])
@@ -385,7 +408,7 @@ class SemanticAnalyzer:
         if isinstance(stmt, PrintCall):
             self.evaluate_expression(stmt.value)
             return DynamicValue()
-        if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral)):
+        if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral, ListLiteral, ExternalModuleCall)):
             return self.evaluate_expression(stmt)
         if isinstance(stmt, ImportStatement):
             return DynamicValue()

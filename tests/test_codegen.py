@@ -234,3 +234,31 @@ class TestCodegen(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             codegen.generate()
         self.assertIn("suporta no máximo 2 binding(s)", str(ctx.exception))
+
+    def test_external_erlang_module_call_codegen(self):
+        code = """
+        import erlang httpc
+
+        fn main() {
+            val response = httpc.request("https://example.com")
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn('Response = httpc:request("https://example.com")', erlang_code)
+
+    def test_external_erlang_module_call_codegen_with_empty_list(self):
+        code = """
+        import erlang ets
+
+        fn main() {
+            val tid = ets.new("users", [])
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn('Tid = ets:new("users", [])', erlang_code)

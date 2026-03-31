@@ -1,0 +1,10 @@
+import erlang math
+import erlang lists
+
+fn main() {
+    val root = math.sqrt(16)
+    val reversed = lists.reverse([1, 2, 3])
+
+    print(root)
+    print(reversed)
+}

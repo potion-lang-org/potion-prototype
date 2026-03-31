@@ -1,6 +1,8 @@
 import unittest
 from parser.potion_parser import (
     Assignment,
+    ErlangImportStatement,
+    ExternalModuleCall,
     FunctionDef,
     ImportStatement,
     LiteralInt,
@@ -63,6 +65,38 @@ class TestParser(unittest.TestCase):
         ast = parser.parse()
         self.assertIsInstance(ast.statements[0], ImportStatement)
         self.assertEqual(ast.statements[0].module_name, "helpers")
+
+    def test_import_erlang_statement(self):
+        tokens = tokenize("import erlang httpc")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[0], ErlangImportStatement)
+        self.assertEqual(ast.statements[0].module_name, "httpc")
+
+    def test_external_module_call_parsing(self):
+        tokens = tokenize("""
+        import erlang httpc
+        fn main() {
+            val response = httpc.request("https://example.com")
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[1].body[0].value, ExternalModuleCall)
+        self.assertEqual(ast.statements[1].body[0].value.module_name, "httpc")
+        self.assertEqual(ast.statements[1].body[0].value.function_name, "request")
+
+    def test_external_module_call_with_list_literal_parsing(self):
+        tokens = tokenize("""
+        import erlang ets
+        fn main() {
+            val tid = ets.new("users", [])
+        }
+        """)
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[1].body[0].value, ExternalModuleCall)
+        self.assertEqual(len(ast.statements[1].body[0].value.args), 2)
 
     def test_receive_on_clause_parsing(self):
         tokens = tokenize("""

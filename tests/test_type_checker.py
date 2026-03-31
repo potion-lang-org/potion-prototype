@@ -180,3 +180,16 @@ class TestTypeChecker(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             codegen.visit(ast.statements[0].body[0])
         self.assertIn("suporta no máximo 2 binding(s)", str(ctx.exception))
+
+    def test_external_erlang_module_call_without_import_raises(self):
+        code = """
+        fn main() {
+            val x = httpc.request("https://example.com")
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("Módulo Erlang 'httpc' não foi importado", str(ctx.exception))

@@ -27,6 +27,10 @@ class ImportStatement(ASTNode):
     def __init__(self, module_name: str):
         self.module_name = module_name
 
+class ErlangImportStatement(ASTNode):
+    def __init__(self, module_name: str):
+        self.module_name = module_name
+
 class Assignment(ASTNode):
     def __init__(self, name: str, value: ASTNode):
         self.name = name
@@ -47,6 +51,16 @@ class FunctionCall(ASTNode):
     def __init__(self, name: str, args: List[ASTNode]):
         self.name = name
         self.args = args
+
+class ExternalModuleCall(ASTNode):
+    def __init__(self, module_name: str, function_name: str, args: List[ASTNode]):
+        self.module_name = module_name
+        self.function_name = function_name
+        self.args = args
+
+class ListLiteral(ASTNode):
+    def __init__(self, elements: List[ASTNode]):
+        self.elements = elements
 
 class MapLiteral(ASTNode):
     def __init__(self, entries):
@@ -180,7 +194,7 @@ class Parser:
             return self.return_statement()
         elif tok[0] == "ID" and self.peek()[0] == "ASSIGN":
             return self.assignment()
-        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE"):
+        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LBRACKET", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE"):
             return self.expression()
         else:
             self.pos += 1  # Skip unrecognized token
@@ -212,8 +226,12 @@ class Parser:
         expr = self.expression()
         return VarDeclaration(name, expr, type_)
 
-    def import_statement(self) -> ImportStatement:
+    def import_statement(self) -> ASTNode:
         self.eat("IMPORT")
+        if self.current()[0] == "ERLANG":
+            self.eat("ERLANG")
+            module_name = self.eat("ID")[1]
+            return ErlangImportStatement(module_name)
         module_name = self.eat("ID")[1]
         return ImportStatement(module_name)
 
@@ -405,10 +423,19 @@ class Parser:
 
     def factor(self) -> ASTNode:
         node = self.primary()
-        while self.current()[0] == "DOT":
-            self.eat("DOT")
-            field = self.eat("ID")[1]
-            node = MemberAccess(node, field)
+        while True:
+            if self.current()[0] == "DOT":
+                self.eat("DOT")
+                field = self.eat("ID")[1]
+                if self.current()[0] == "LPAREN":
+                    if not isinstance(node, Identifier):
+                        raise SyntaxError("Chamada externa deve usar o formato <modulo>.<funcao>(...)")
+                    args = self.call_arguments()
+                    node = ExternalModuleCall(node.name, field, args)
+                    continue
+                node = MemberAccess(node, field)
+                continue
+            break
         return node
     
     def primary(self) -> ASTNode:
@@ -441,6 +468,8 @@ class Parser:
             return self.spawn_expression()
         elif tok_type == "LBRACE":
             return self.map_literal()
+        elif tok_type == "LBRACKET":
+            return self.list_literal()
 
         elif tok_type == "LPAREN":
             self.eat("LPAREN")
@@ -456,6 +485,16 @@ class Parser:
         if self.current()[0] != "LPAREN":
             return Identifier(name)
 
+        args = self.call_arguments()
+
+        if name == "print":
+            if len(args) != 1:
+                raise SyntaxError(f"print espera 1 argumento, recebeu {len(args)}")
+            return PrintCall(args[0])
+
+        return FunctionCall(name, args)
+
+    def call_arguments(self) -> List[ASTNode]:
         self.eat("LPAREN")
         args = []
         if self.current()[0] != "RPAREN":
@@ -464,13 +503,7 @@ class Parser:
                 self.eat("COMMA")
                 args.append(self.expression())
         self.eat("RPAREN")
-
-        if name == "print":
-            if len(args) != 1:
-                raise SyntaxError(f"print espera 1 argumento, recebeu {len(args)}")
-            return PrintCall(args[0])
-
-        return FunctionCall(name, args)
+        return args
 
     def type_name(self) -> str:
         tok_type, tok_value = self.current()
@@ -502,3 +535,14 @@ class Parser:
 
         self.eat("RBRACE")
         return MapLiteral(entries)
+
+    def list_literal(self) -> ListLiteral:
+        self.eat("LBRACKET")
+        elements = []
+        if self.current()[0] != "RBRACKET":
+            elements.append(self.expression())
+            while self.current()[0] == "COMMA":
+                self.eat("COMMA")
+                elements.append(self.expression())
+        self.eat("RBRACKET")
+        return ListLiteral(elements)
