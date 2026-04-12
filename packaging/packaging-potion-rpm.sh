@@ -19,13 +19,22 @@ echo "==> Verificando dependências do sistema..."
 check_command python3
 check_command rpmbuild
 
+mkdir -p "${BUILD_DIR}"
+
 echo "==> Limpando diretórios anteriores..."
 rm -rf "${RPMBUILD_ROOT}"
 mkdir -p "${RPMBUILD_ROOT}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 echo "==> Gerando distribuição Python..."
-python3 -m build --sdist --wheel --outdir "${BUILD_DIR}" >/dev/null
-SDIST_PATH=$(ls "${BUILD_DIR}"/${PACKAGE_NAME}-${VERSION}.tar.gz)
+(
+    cd "${PROJECT_ROOT}"
+    python3 setup.py sdist --dist-dir "${BUILD_DIR}" >/dev/null
+)
+SDIST_PATH=$(find "${BUILD_DIR}" -maxdepth 1 -type f \( -name "${PACKAGE_NAME}-${VERSION}.tar.gz" -o -name "${PACKAGE_NAME//-/_}-${VERSION}.tar.gz" \) -print -quit)
+if [ -z "${SDIST_PATH:-}" ] || [ ! -f "${SDIST_PATH}" ]; then
+    echo "Erro: arquivo sdist não encontrado em ${BUILD_DIR}." >&2
+    exit 1
+fi
 cp "${SDIST_PATH}" "${RPMBUILD_ROOT}/SOURCES/"
 
 echo "==> Criando spec file..."
@@ -35,13 +44,13 @@ Version:        ${VERSION}
 Release:        1%{?dist}
 Summary:        Potion Language compiler and CLI
 
-License:        Apache-2.0
+License:        MIT
 URL:            https://github.com/potion-lang-org/potion
-Source0:        %{name}-%{version}.tar.gz
+Source0:        $(basename "${SDIST_PATH}")
 
 BuildArch:      noarch
 BuildRequires:  python3-devel, python3-setuptools
-Requires:       python3 >= 3.10, erlang
+Requires:       python3 >= 3.8, erlang
 
 %description
 Potion é uma linguagem minimalista focada em gerar código Erlang, fornecendo a CLI 'potionc'.
@@ -60,7 +69,12 @@ rm -rf %{buildroot}
 %license LICENSE
 %doc README.md README-pt-br.md
 %{_bindir}/potionc
-%{python3_sitelib}/potion_lang*
+%{python3_sitelib}/cli/
+%{python3_sitelib}/codegen/
+%{python3_sitelib}/lexer/
+%{python3_sitelib}/parser/
+%{python3_sitelib}/semantic/
+%{python3_sitelib}/potion_lang-*.dist-info/
 
 %changelog
 * Wed Sep 21 2025 Willians Costa da Silva <willianscsilva@gmail.com> - ${VERSION}-1

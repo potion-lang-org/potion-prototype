@@ -22,28 +22,33 @@ echo "==> Limpando diretórios anteriores..."
 rm -rf "${DEB_BUILD_ROOT}"
 mkdir -p "${DEB_BUILD_ROOT}/DEBIAN"
 mkdir -p "${DEB_BUILD_ROOT}/usr/bin"
-mkdir -p "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}"
+mkdir -p "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages"
+mkdir -p "${DEB_BUILD_ROOT}/usr/share/doc/${PACKAGE_NAME}"
+mkdir -p "${BUILD_DIR}"
 
-echo "==> Construindo pacote Python (wheel/sdist)..."
-check_command python3
-python3 -m build --sdist --wheel --outdir "${BUILD_DIR}" >/dev/null
+echo "==> Copiando módulos Python para o diretório de controle..."
+cp -R "${PROJECT_ROOT}/cli" "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages/"
+cp -R "${PROJECT_ROOT}/codegen" "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages/"
+cp -R "${PROJECT_ROOT}/lexer" "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages/"
+cp -R "${PROJECT_ROOT}/parser" "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages/"
+cp -R "${PROJECT_ROOT}/semantic" "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages/"
+find "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}/site-packages" -type d -name "__pycache__" -prune -exec rm -rf {} +
 
-echo "==> Instalando pacote no diretório de controle..."
-check_command python3
-python3 -m pip install "${BUILD_DIR}"/${PACKAGE_NAME}-*.whl \
-    --target "${DEB_BUILD_ROOT}/usr/lib/${PACKAGE_NAME}" --no-compile --no-deps >/dev/null
+cp "${PROJECT_ROOT}/README.md" "${DEB_BUILD_ROOT}/usr/share/doc/${PACKAGE_NAME}/"
+cp "${PROJECT_ROOT}/README-pt-br.md" "${DEB_BUILD_ROOT}/usr/share/doc/${PACKAGE_NAME}/"
+cp "${PROJECT_ROOT}/LICENSE" "${DEB_BUILD_ROOT}/usr/share/doc/${PACKAGE_NAME}/copyright"
 
 echo "==> Criando wrapper 'potionc'..."
 cat > "${DEB_BUILD_ROOT}/usr/bin/potionc" <<'EOF'
 #!/usr/bin/env bash
 PYTHON_EXEC="/usr/bin/python3"
-SCRIPT_PATH="/usr/lib/potion-lang/cli/potionc.py"
-exec "$PYTHON_EXEC" "$SCRIPT_PATH" "$@"
+SITE_PACKAGES="/usr/lib/potion-lang/site-packages"
+export PYTHONPATH="${SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"
+exec "$PYTHON_EXEC" -m cli.potionc "$@"
 EOF
 chmod +x "${DEB_BUILD_ROOT}/usr/bin/potionc"
 
 echo "==> Gerando metadata DEBIAN/control..."
-PY_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 cat > "${DEB_BUILD_ROOT}/DEBIAN/control" <<EOF
 Package: ${PACKAGE_NAME}
 Version: 0.1.0
@@ -51,7 +56,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Maintainer: Willians Costa da Silva <willianscsilva@gmail.com>
-Depends: python3 (>= 3.10), erlang
+Depends: python3 (>= 3.8), erlang
 Description: Potion Language compiler and CLI
  Minimal language that targets Erlang/OTP, providing a CLI 'potionc'.
 EOF

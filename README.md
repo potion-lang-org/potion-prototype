@@ -344,6 +344,26 @@ pip install .
 
 After `pip install -e .`, changes in the compiler source are picked up by the installed `potionc` command without reinstalling after every edit.
 
+Package installation:
+```bash
+# Debian/Ubuntu
+sudo apt install ./dist/potion-lang_0.1.0_all.deb
+
+# Fedora/RHEL
+sudo dnf install ./dist/rpmbuild/RPMS/noarch/potion-lang-0.1.0-1.noarch.rpm
+```
+
+Package generation:
+```bash
+# generate the .deb package
+bash packaging/packaging-potion-deb.sh
+
+# generate the .rpm package
+bash packaging/packaging-potion-rpm.sh
+```
+
+The scripts above generate installable packages that declare runtime dependencies on Python 3.8+ and Erlang/OTP. Use `apt` or `dnf` to install the generated files so the package manager can resolve those dependencies automatically.
+
 **Usage**
 ```bash
 python -m cli.potionc path/to/file.potion [options]
