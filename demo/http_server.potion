@@ -1,0 +1,23 @@
+import http_router
+import erlang demo_support
+
+fn start(port: int, manager_pid: pid) {
+    val listener = demo_support.listen(port)
+    print("[boot] http server listening on port " + to_string(port))
+    return accept_loop(listener, manager_pid)
+}
+
+fn accept_loop(listener, manager_pid: pid) {
+    val socket = demo_support.accept(listener)
+    sp handle_client(socket, manager_pid)
+    return accept_loop(listener, manager_pid)
+}
+
+fn handle_client(socket, manager_pid: pid) {
+    val request = demo_support.read_request(socket)
+    print("[http] request received: " + request.method + " " + request.path)
+
+    val response = route(request, manager_pid)
+    demo_support.send_json(socket, response.status, response.body, response.json_array)
+    demo_support.close(socket)
+}
