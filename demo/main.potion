@@ -1,0 +1,21 @@
+import http_server
+import feature_manager
+import erlang code
+import erlang compile
+import erlang demo_support
+
+val port: int = 4040
+val data_dir = ".mnesia"
+
+fn main() {
+    print("[boot] starting feature server demo")
+    compile.file("demo_support.erl")
+    code.load_abs("demo_support")
+    demo_support.setup(data_dir)
+    print("[boot] mnesia ready")
+
+    val manager_pid: pid = sp loop()
+    print("[boot] feature_manager online")
+
+    start(port, manager_pid)
+}

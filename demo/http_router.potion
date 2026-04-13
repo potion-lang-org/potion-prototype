@@ -1,0 +1,110 @@
+fn route(request, manager_pid: pid) {
+    if request.parse_error == none {
+        return dispatch(request, manager_pid)
+    } else {
+        print("[http] parse error: " + request.parse_error)
+        return json_response(400, {error: request.parse_error})
+    }
+}
+
+fn dispatch(request, manager_pid: pid) {
+    if request.method == "POST" {
+        if request.path == "/features" {
+            return handle_upsert(request, manager_pid)
+        } else {
+            return not_found()
+        }
+    } else {
+        if request.method == "GET" {
+            if request.feature_name == none {
+                if request.path == "/features" {
+                    return handle_list(manager_pid)
+                } else {
+                    return not_found()
+                }
+            } else {
+                return handle_get(request, manager_pid)
+            }
+        } else {
+            return json_response(405, {error: "method_not_allowed"})
+        }
+    }
+}
+
+fn handle_upsert(request, manager_pid: pid) {
+    val body = request.body
+
+    if body == none {
+        return json_response(400, {error: "invalid_json_body"})
+    } else {
+        if body.name == none {
+            return json_response(400, {error: "name_is_required"})
+        } else {
+            if body.environment == none {
+                return json_response(400, {error: "environment_is_required"})
+            } else {
+                if valid_enabled(body.enabled) {
+                    print("[http] routing create/update for " + body.name + "@" + body.environment)
+                    send(manager_pid, {upsert_feature: body, reply_to: self()})
+                    return await_response()
+                } else {
+                    return json_response(400, {error: "enabled_must_be_boolean"})
+                }
+            }
+        }
+    }
+}
+
+fn handle_get(request, manager_pid: pid) {
+    if request.environment == none {
+        return json_response(400, {error: "environment_query_param_is_required"})
+    } else {
+        val payload = {name: request.feature_name, environment: request.environment}
+        print("[http] routing get for " + request.feature_name + "@" + request.environment)
+        send(manager_pid, {get_feature: payload, reply_to: self()})
+        return await_response()
+    }
+}
+
+fn handle_list(manager_pid: pid) {
+    print("[http] routing list all features")
+    send(manager_pid, {list_features: {all: true}, reply_to: self()})
+    return await_response()
+}
+
+fn await_response() {
+    receive {
+        on response(reply) {
+            return reply
+        }
+
+        on any {
+            print("[http] unexpected reply from feature_manager")
+            return json_response(500, {error: "internal_error"})
+        }
+    }
+}
+
+fn valid_enabled(value) {
+    if value == true {
+        return true
+    } else {
+        if value == false {
+            return true
+        } else {
+            return false
+        }
+    }
+}
+
+fn json_response(status: int, body) {
+    return {status: status, body: body, json_array: false}
+}
+
+fn json_array_response(status: int, body) {
+    return {status: status, body: body, json_array: true}
+}
+
+fn not_found() {
+    return json_response(404, {error: "not_found"})
+}

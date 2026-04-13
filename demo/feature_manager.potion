@@ -1,0 +1,50 @@
+import http_router
+import erlang demo_support
+
+fn loop() {
+    receive {
+        on upsert_feature(payload, caller) {
+            print("[manager] create/update feature " + payload.name + "@" + payload.environment)
+            val updated_at = demo_support.now_rfc3339()
+            val saved = demo_support.mnesia_upsert_feature(
+                payload.name,
+                payload.environment,
+                payload.enabled,
+                payload.description,
+                updated_at
+            )
+
+            send(caller, {response: json_response(200, saved)})
+            loop()
+        }
+
+        on get_feature(payload, caller) {
+            print("[manager] get feature " + payload.name + "@" + payload.environment)
+            val feature = demo_support.mnesia_get_feature(payload.name, payload.environment)
+
+            if feature == none {
+                send(caller, {response: json_response(404, {
+                    error: "feature_not_found",
+                    name: payload.name,
+                    environment: payload.environment
+                })})
+            } else {
+                send(caller, {response: json_response(200, feature)})
+            }
+
+            loop()
+        }
+
+        on list_features(payload, caller) {
+            print("[manager] list all features")
+            val features = demo_support.mnesia_list_features()
+            send(caller, {response: json_array_response(200, features)})
+            loop()
+        }
+
+        on any {
+            print("[manager] unexpected message")
+            loop()
+        }
+    }
+}
