@@ -1,22 +1,24 @@
 # Potion Language Specification
 
-This document describes the current implemented surface of the Potion language in this repository.
+This document describes the current implemented surface of Potion in this repository.
 
 It is a practical reference for the compiler as it exists today, not a future-facing proposal.
 
 ## Overview
 
-Potion is a small language that compiles to Erlang source code.
+Potion is a small language that compiles to Erlang source code and then to BEAM bytecode through the existing CLI flow.
 
 Current implementation focus:
 
-- simple declarations with `val` and local mutable bindings with `var`
-- functions and returns
+- top-level `val` declarations
+- function-local mutable bindings with `var`
+- functions and explicit `return`
 - arithmetic and comparisons
-- maps and pattern matching
-- message passing and process spawning
+- maps, lists, and pattern matching
+- process spawning and message passing
 - lightweight type annotations and inference
 - semantic analysis before Erlang code generation
+- Erlang interop through imported modules
 
 ## Reserved Keywords
 
@@ -92,6 +94,8 @@ val total = 10
 val total: int = 10
 ```
 
+At module level, `val` is the only supported declaration form.
+
 ### `var`
 
 Function-local mutable binding form supported by the compiler:
@@ -104,8 +108,12 @@ var current: none = none
 Local reassignment is supported:
 
 ```potion
-var total: int = 1
-total = total + 1
+fn accumulate() {
+    var total: int = 1
+    total = total + 1
+    total = total * 3
+    print("Total = " + to_string(total))
+}
 ```
 
 Important:
@@ -121,16 +129,34 @@ Important:
 Top-level bindings are expressed with `val` and are emitted as Erlang macros:
 
 ```potion
-val base = 10
+val rate = 5
+val message = "hello"
 ```
 
 becomes:
 
 ```erlang
--define(BASE, 10).
+-define(RATE, 5).
+-define(MESSAGE, "hello").
 ```
 
 Local bindings inside functions are emitted as capitalized Erlang variables.
+
+```potion
+fn calculate(delta: int) {
+    val next = rate + delta
+    return next
+}
+```
+
+becomes:
+
+```erlang
+calculate(Delta) ->
+    Next = (?RATE + Delta),
+    Next.
+```
+
 For mutable local `var`, the compiler internally emits versioned Erlang variables to preserve Erlang's single-assignment model.
 
 ## Functions
@@ -158,20 +184,19 @@ fn greet(name: str, suffix) {
 }
 ```
 
-## Modules and Imports
+## Modules And Imports
 
 Potion uses one source file per module.
 
-Import syntax:
+### Importing sibling Potion modules
 
 ```potion
 import module_helpers
-```
 
-External Erlang module import syntax:
-
-```potion
-import erlang httpc
+fn main() {
+    greet("Bruce")
+    announce("Bruce", 42)
+}
 ```
 
 Current rules:
@@ -181,18 +206,38 @@ Current rules:
 - imported functions can be called directly by name in Potion source
 - imported calls are emitted as remote Erlang calls such as `module_helpers:greet(...)`
 - local functions take precedence over imported functions with the same name and arity
-- `import erlang module_name` registers an external Erlang module for the current file
-- external Erlang calls use the form `module_name.function_name(...)`
-- external Erlang calls are emitted as `module_name:function_name(...)`
-- the semantic analyzer only checks whether the Erlang module was imported before use
 
 Current limitations:
 
-- only imported functions are exposed to the importing module
-- imported top-level `val` bindings are not exposed
+- imported `.potion` modules expose functions, not imported top-level `val` bindings
 - there is no alias syntax and no selective import syntax
 - nested directory module paths are not implemented
-- external Erlang interop does not validate function existence or arity
+
+### Importing Erlang modules
+
+```potion
+import erlang math
+import erlang lists
+
+fn main() {
+    val root = math.sqrt(16)
+    val reversed = lists.reverse([1, 2, 3])
+    print(root)
+    print(reversed)
+}
+```
+
+Current rules:
+
+- `import erlang module_name` registers an external Erlang module for the current file
+- external Erlang calls use the form `module_name.function_name(...)`
+- external Erlang calls are emitted as `module_name:function_name(...)`
+- the semantic analyzer checks whether the Erlang module was imported before use
+
+Current limitations:
+
+- Erlang interop does not validate module existence, function existence, or arity
+- Potion still has no atom literal syntax, so some Erlang APIs are callable but not fully ergonomic yet
 
 ## Expressions
 
@@ -261,17 +306,26 @@ Returns the current Erlang process id.
 val me: pid = self()
 ```
 
+Typical use:
+
+```potion
+send(worker_pid, {hello: "Bruce", reply_to: self()})
+```
+
+`reply_to` is not a reserved keyword. It is just the current message-shape convention used by the compiler's `receive` sugar.
+
 ### `to_string(value)`
 
 Converts a value to a string-like Erlang list.
 
 ```potion
+val age: int = 42
 print("Age: " + to_string(age))
 ```
 
 Current conversion behavior:
 
-- strings/lists: unchanged
+- strings and lists: unchanged
 - integers: `integer_to_list/1`
 - booleans: converted from atoms
 - `none` / `undefined`: `"undefined"`
@@ -279,22 +333,9 @@ Current conversion behavior:
 - binaries: `binary_to_list/1`
 - fallback: `io_lib:format("~p", ...)` flattened to a list
 
-## Semantic Analysis
-
-Before Erlang code generation, Potion runs a semantic analysis phase.
-
-Current responsibilities:
-
-- record declared names and function arities
-- track local mutable `var` bindings
-- infer simple value types when possible
-- validate explicit type annotations
-- reject invalid reassignment
-- reject incompatible `+` operations such as `str + int`
-
 Potion favors explicit conversion over implicit coercion.
 
-For example, this is invalid:
+This is invalid:
 
 ```potion
 val age: int = 42
@@ -308,22 +349,84 @@ val age: int = 42
 val message = "Age: " + to_string(age)
 ```
 
+## Semantic Analysis
+
+Before Erlang code generation, Potion runs a semantic analysis phase.
+
+Current responsibilities:
+
+- record declared names and function arities
+- track local mutable `var` bindings
+- infer simple value types when possible
+- validate explicit type annotations
+- reject invalid reassignment
+- reject incompatible `+` operations such as `str + int`
+- ensure Erlang module calls reference modules imported through `import erlang`
+
+Type checking is intentionally lightweight and tied to the current compiler pipeline.
+
 ## Control Flow
 
 ### `if / else`
 
 ```potion
-if score > 0 {
-    print("positive")
-} else {
-    print("zero or negative")
+fn classify(score) {
+    val approved: bool = score >= 7
+
+    if approved {
+        print("approved")
+    } else {
+        print("rejected")
+    }
 }
 ```
 
 This is emitted as an Erlang `case` on the condition.
+
 When mutable `var` bindings are reassigned inside branches, the compiler emits a merge step after the `case` so later expressions can refer to the updated value.
 
-## Maps and Pattern Matching
+Example:
+
+```potion
+fn main() {
+    var total: int = 1
+
+    if true {
+        total = total + 2
+    } else {
+        total = total + 10
+    }
+
+    print("Total = " + to_string(total))
+}
+```
+
+## `none`
+
+`none` is the language-level spelling for the absence of a value.
+
+```potion
+var current: none = none
+```
+
+It is emitted as Erlang `undefined`.
+
+Example:
+
+```potion
+var current: none = none
+val fallback: str = "anonymous"
+
+fn describe(name) {
+    if name == none {
+        print("Missing name")
+    } else {
+        print("Name: " + name)
+    }
+}
+```
+
+## Maps, Lists, And Pattern Matching
 
 ### Map literals
 
@@ -331,17 +434,34 @@ When mutable `var` bindings are reassigned inside branches, the compiler emits a
 val person = {name: "Bruce", age: 42}
 ```
 
+Map keys are currently bare identifiers and become Erlang atoms.
+
+Nested maps are supported:
+
+```potion
+val request = {
+    user: {name: "Bruce"},
+    meta: {source: "api"}
+}
+```
+
 ### List literals
 
 ```potion
 val numbers = [1, 2, 3]
+print(numbers)
 ```
+
+Lists are especially useful when interoperating with Erlang modules such as `lists`.
 
 ### `match`
 
 ```potion
 match person {
-    {name: who, age: years} => print(who)
+    {name: who, age: years} => {
+        print("Name: " + who)
+        print("Age: " + to_string(years))
+    }
     _ => print("unknown")
 }
 ```
@@ -350,14 +470,28 @@ Supported pattern forms:
 
 - identifier bindings
 - `_` wildcard
-- literal integers, strings and booleans
+- literal integers, strings, and booleans
 - `none`
 - nested map patterns
+
+Example with nested patterns:
+
+```potion
+match request {
+    {user: {name: who}, meta: {source: source}} => {
+        print("User: " + who)
+        print("Source: " + source)
+    }
+    _ => print("invalid request")
+}
+```
 
 Notes:
 
 - a pattern key like `age` binds whatever is on the right-hand side, for example `age: years`
 - after that pattern, the bound variable is `years`, not `age`
+- `match` compiles to an Erlang `case`
+- if mutable `var` bindings are reassigned inside `match` branches, the compiler merges the final version after the control-flow expression
 
 ## Concurrency
 
@@ -387,23 +521,6 @@ If the sender expects a response, the common pattern is to include its own pid i
 send(worker_pid, {hello: "Bruce", reply_to: self()})
 ```
 
-Inside `receive`, the receiver can bind that pid positionally through `on <tag>(...)` and reply explicitly:
-
-```potion
-receive {
-    on hello(name, caller) {
-        send(caller, {ok: "received"})
-    }
-}
-```
-
-Notes:
-
-- `self()` returns the pid of the current process
-- `reply_to` is not a reserved keyword; it is a conventional map key
-- `caller` is not a reserved keyword; it is just the local binding name used in the receive clause
-- this is a message protocol convention built on top of `send`, not a special reply feature of the language
-
 ### `receive`
 
 ```potion
@@ -419,19 +536,54 @@ receive {
 ```
 
 Compiles to an Erlang `receive ... end`.
+
 Inside `receive`, `on <tag>(arg1, arg2, ...)` is sugar for map pattern matching.
-The first binding maps to the main payload under `<tag>`, and the following bindings map to extra fields by fixed convention.
-Today, the first extra field is `reply_to`.
-`on any` compiles to the fallback `_` clause.
-Optional `when` expressions compile to Erlang guards.
-If mutable `var` bindings are reassigned inside `receive` bodies or nested `match` clauses, the compiler merges the final version after the control-flow expression.
+
+Current binding convention:
+
+- the first binding maps to the payload under the message tag
+- the next binding maps to `reply_to`
+- `on any` compiles to the fallback `_` clause
+- optional `when` expressions compile to Erlang guards
 
 Example:
 
 ```potion
+fn worker() {
+    receive {
+        on hello(name, caller) {
+            print("Hello, " + name)
+            send(caller, {ok: "received"})
+        }
+
+        on any {
+            print("unexpected message")
+        }
+    }
+}
+
+fn main() {
+    val proc_id: pid = sp worker()
+    send(proc_id, {hello: "Bruce", reply_to: self()})
+
+    receive {
+        on ok(text) {
+            print(text)
+        }
+
+        on any {
+            print("no response")
+        }
+    }
+}
+```
+
+Example with a guard:
+
+```potion
 receive {
     on data(value, caller) when value > 10 {
-        print(value)
+        send(caller, {ok: value})
     }
 
     on any {
@@ -439,6 +591,32 @@ receive {
     }
 }
 ```
+
+If mutable `var` bindings are reassigned inside `receive` bodies, the compiler merges the final version after the control-flow expression.
+
+## Erlang HTTP Interop
+
+Potion can call Erlang modules directly after an explicit import.
+
+```potion
+import erlang ssl
+import erlang inets
+import erlang httpc
+
+fn main() {
+    ssl.start()
+    inets.start()
+
+    val response = httpc.request("https://datatrail.com.br")
+    print(response)
+}
+```
+
+This compiles to remote Erlang calls such as `ssl:start()`, `inets:start()`, and `httpc:request(...)`.
+
+For HTTPS requests, `ssl.start()` must run before `httpc.request(...)`.
+
+The feature-server demo under [`../demo/`](../demo/) uses this same interop approach together with Erlang bridge code for HTTP and Mnesia operations.
 
 ## Code Generation Rules
 
@@ -476,6 +654,7 @@ Example:
 - module-level mutable state is not part of the language
 - parameter type annotations are optional, but return type annotations are not implemented
 - imports across `.potion` files are limited to sibling modules and imported functions
+- imported `.potion` modules do not expose imported global `val` bindings
 - Erlang interop is limited to `import erlang <module>` and `<module>.<function>(...)`
 - Erlang interop does not validate module existence, function existence, or arity
 - there is no tuple syntax yet
