@@ -1,481 +1,209 @@
-# Potion Language — Design Document
+# Potion
+
+Experimental language for the BEAM with simple syntax, explicit concurrency, and Erlang interop.
+
+Potion is a small language project built to compile `.potion` source into Erlang and run on the BEAM today. It exists as a practical experiment in language design, compiler construction, and concurrent application structure, not as a replacement for Erlang or Elixir. The current compiler already handles a real `.potion -> .erl -> .beam` pipeline and includes a working feature-server demo under [`demo/`](./demo/).
 
 > 🇧🇷 [Versão em Português](./README-pt-br.md)  
+> 📘 [Language Spec (EN)](./docs/language-spec.md) • [Especificação da Linguagem (PT-BR)](./docs/language-spec.pt-br.md)  
+> 🏗️ [Architecture Notes](./docs/architecture.md)  
 > 🤝 [Contributing (EN)](./.github/CONTRIBUTING.en.md) • [Contribuindo (PT-BR)](./.github/CONTRIBUTING.pt-br.md)  
 > 📜 [Code of Conduct (EN)](./.github/CODE_OF_CONDUCT.en.md) • [Código de Conduta (PT-BR)](./.github/CODE_OF_CONDUCT.pt-br.md)
-> 📘 [Language Spec (EN)](./docs/language-spec.md) • [Especificação da Linguagem (PT-BR)](./docs/language-spec.pt-br.md)
 
----
+## Why Potion Exists
 
-## 📖 Overview
+Potion exists to explore what a smaller, more direct language for BEAM-targeted programs can feel like in practice:
 
-**Potion** is a minimalist language inspired by Python, Go, Erlang, and Rust, designed for learning, experimentation, and generating Erlang code from a simple and expressive syntax.  
-Its goal is to make writing business logic clear and safe, producing efficient code for concurrent environments such as the BEAM/Erlang VM.
+- simple syntax for business logic and message-passing workflows
+- explicit concurrency with `sp`, `send`, and `receive`
+- straightforward Erlang interop instead of pretending the BEAM ecosystem does not exist
+- a real compiler pipeline that stays readable enough for experimentation and learning
 
----
+Potion is not trying to replace Erlang or Elixir. The current direction is narrower: a practical experiment in simplicity, concurrency, and interop on top of Erlang/OTP.
 
-## ✨ Goals
+## What Works Today
 
-- Modern, lightweight syntax (Python/Rust vibes) that targets Erlang/OTP.
-- Simple bindings with `val` and local mutable bindings with `var`.
-- Optional type annotations with basic inference.
-- First-class concurrency primitives (`sp`, `send`, `receive`, `match`).
-- Ergonomic pattern matching and map literals that translate to Erlang maps.
-- Generated Erlang that follows idiomatic practices (macros for globals, explicit returns, `ok` fallbacks).
-- Extensibility for richer data structures and modules, on top of the current semantic analysis phase.
+- Compile `.potion` source into `.erl`, then into `.beam`
+- Functions, `val`, function-local `var`, and explicit `return`
+- Basic type annotations and lightweight semantic checks
+- Maps, lists, `if`/`else`, `match`, and `none`
+- Imports between sibling `.potion` modules
+- Erlang interop via `import erlang <module>`
+- Concurrency with `sp`, `send`, `receive`, and `self()`
+- CLI workflow through `potionc`
+- A real feature-server demo under [`demo/`](./demo/)
 
----
+## Real Demo
 
-## ✅ Current Features
+The fastest proof that Potion is already doing real work is the feature-server POC in [`demo/`](./demo/). It compiles Potion modules, uses Erlang support code for HTTP/Mnesia, and coordinates requests through a concurrent manager process.
 
-- `val` declarations with optional type hints (`val total: int = 42`).
-- `var` declarations with optional type hints (`var current: none = none`).
-- Function parameters with optional type hints (`fn greet(name: str, age: int) { ... }`).
-- Local reassignment for `var` with syntax like `current = next_value`.
-- Module imports between `.potion` files with `import module_name`.
-- Generic Erlang module imports with `import erlang module_name`.
-- Functions with parameters, local bindings, and explicit `return`.
-- Literals for integers, strings, booleans, maps, lists, and `none`.
-- Arithmetic (`+`, `-`, `*`, `/`) and comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`).
-- String concatenation with `+`, emitted as `++` in Erlang.
-- `if` / `else` conditionals compiled to Erlang `case` expressions.
-- Map literals and nested pattern matching via `match` blocks.
-- Concurrency building blocks: spawning processes with `sp`, sending messages with `send`, and awaiting them via `receive`.
-- Built-in `self()` support for obtaining the current Erlang process id.
-- Built-in `to_string(...)` for stringifying values before concatenation.
-- Built-in `print(...)` that maps to `io:format`.
-- Dedicated semantic analysis with type checking and inference for `int`, `str`, `bool`, `none`, `pid`, and `dynamic`.
-- CLI tool (`potionc`) that transpiles `.potion` files to `.erl` and optionally compiles/runs them.
-- Example `.potion` programs under [`examples/`](./examples/).
+Run it from the `demo/` directory:
 
----
-
-## 🏗️ Language Building Blocks
-
-### Global bindings
-```potion
-val rate = 5
-val message = "Hello"
+```bash
+cd demo
+potionc --run main.potion
 ```
 
-→ Emitted as Erlang macros:
-```erlang
--define(RATE, 5).
--define(MESSAGE, "Hello").
+The demo currently expects `demo_support.erl` to be available by relative path, so running it from inside `demo/` is the practical path today.
+
+Then hit the server on `http://localhost:4040`:
+
+```bash
+curl -i -X POST http://localhost:4040/features \
+  -H 'content-type: application/json' \
+  -d '{
+    "name": "new_checkout",
+    "environment": "prod",
+    "enabled": true,
+    "description": "new checkout flow"
+  }'
 ```
 
-> ℹ️ Global names become `?MACROS` in Erlang; locals keep a Capitalized style (`Value`).
-> Potion uses `val` for module-level bindings and `var` for mutable local state inside functions.
+Representative response:
 
-### Functions
-```potion
-fn calculate(delta: int) {
-    val next = rate + delta
-    return next * 2
+```json
+{
+  "name": "new_checkout",
+  "environment": "prod",
+  "enabled": true,
+  "description": "new checkout flow",
+  "updated_at": "2026-04-13T12:34:56Z"
 }
 ```
 
-→ Erlang:
-```erlang
-calculate(Delta) ->
-    Next = (?RATE + Delta),
-    (Next * 2).
+```bash
+curl -i "http://localhost:4040/features/new_checkout?environment=prod"
 ```
 
-### Modules and imports
-```potion
-import module_helpers
-
-fn main() {
-    greet("Bruce")
+```json
+{
+  "name": "new_checkout",
+  "environment": "prod",
+  "enabled": true,
+  "description": "new checkout flow",
+  "updated_at": "2026-04-13T12:34:56Z"
 }
 ```
 
-Potion resolves `import module_helpers` to `module_helpers.potion` in the same directory as the importing file.
-Imported function calls are written without qualification in Potion and emitted as remote Erlang calls internally.
+```bash
+curl -i http://localhost:4040/features
+```
 
-Potion also supports generic Erlang interop:
+```json
+[
+  {
+    "name": "new_checkout",
+    "environment": "prod",
+    "enabled": true,
+    "description": "new checkout flow",
+    "updated_at": "2026-04-13T12:34:56Z"
+  }
+]
+```
+
+More demo details live in [`demo/README.md`](./demo/README.md).
+
+## Quick Language Taste
+
+Function and local bindings:
 
 ```potion
-import erlang math
-import erlang lists
+val base: int = 10
 
-fn main() {
-    val root = math.sqrt(16)
-    val reversed = lists.reverse([1, 2, 3])
-    print(root)
-    print(reversed)
+fn sum(delta: int) {
+    var total: int = base
+    total = total + delta
+    return total
 }
 ```
 
-This compiles calls such as `math.sqrt(...)` and `lists.reverse(...)` to `math:sqrt(...)` and `lists:reverse(...)`.
-In V1, Potion only checks that the Erlang module was imported before use; it does not validate function existence or arity.
+Concurrency:
 
-### Types and `none`
-```potion
-val current: none = none
-val ready: bool = true
-val pid_ref: pid = self()
-```
-
-→ `none` is emitted as `undefined` in Erlang.
-
-### `var` reassignment
-```potion
-fn accumulate() {
-    var total: int = 1
-    total = total + 2
-    print(total)
-}
-```
-
-Potion compiles local `var` reassignment to versioned Erlang variables internally.
-That preserves Erlang's single-assignment semantics while exposing mutable-style syntax at the Potion level.
-
-### Conditionals
-```potion
-fn check(score) {
-    if score > 0 {
-        print("Positive")
-    } else {
-        print("Zero or negative")
-    }
-}
-```
-
-→ Erlang:
-```erlang
-check(Score) ->
-    case (Score > 0) of
-        true ->
-            io:format("~p~n", ["Positive"]);
-        _ ->
-            io:format("~p~n", ["Zero or negative"])
-    end.
-```
-
-### Map literals & pattern matching
-```potion
-fn describe(person) {
-    match person {
-        {name: who, age: years} => print("Name: " + who)
-        _ => print("Unknown person")
-    }
-}
-```
-
-→ Erlang:
-```erlang
-describe(Person) ->
-    case Person of
-        #{name := Who, age := Years} ->
-            io:format("~p~n", ["Name: " ++ Who]);
-        _ ->
-            io:format("~p~n", ["Unknown person"])
-    end.
-```
-
-> 🔒 Keys must currently be bare identifiers (emitted as atoms) and values can nest other maps or identifiers.
-
-### Lists
-```potion
-val numbers = [1, 2, 3]
-print(numbers)
-```
-
-→ Erlang:
-```erlang
-Numbers = [1, 2, 3],
-io:format("~p~n", [Numbers]).
-```
-
-Lists are especially useful when interoperating with Erlang modules such as `lists`.
-
-### Concurrency (`sp`, `send`, `receive`, `match`)
 ```potion
 fn worker() {
     receive {
         on hello(name, caller) {
-            print("Hi, " + name)
-            send(caller, {ok: "Message received"})
-        }
-
-        on any {
-            print("Unexpected message")
+            send(caller, {ok: "hello " + name})
         }
     }
 }
 
 fn main() {
-    val pid = sp worker()
+    val pid: pid = sp worker()
     send(pid, {hello: "Bruce", reply_to: self()})
-
-    receive {
-        on ok(text) {
-            print(text)
-        }
-
-        on any {
-            print("No reply")
-        }
-    }
 }
 ```
 
-→ Erlang:
-```erlang
-worker() ->
-    receive
-        #{hello := Name, reply_to := Caller} ->
-            io:format("~p~n", ["Hi, " ++ Name]),
-            Caller ! #{ok => "Message received"};
-        _ ->
-            io:format("~p~n", ["Unexpected message"])
-    end.
-
-main() ->
-    Pid = spawn(fun () -> worker() end),
-    Pid ! #{hello => "Bruce", reply_to => self()},
-    receive
-        #{ok := Text} ->
-            io:format("~p~n", [Text]);
-        _ ->
-            io:format("~p~n", ["No reply"])
-    end.
-```
-
-### Printing & strings
-```potion
-print("Total: " + to_string(result))
-print("Age: " + to_string(age))
-```
-
-→ `io:format("~p~n", ["Total: " ++ potion_to_string_builtin(Result)])`
-
-Potion does not perform implicit coercion for mixed `+` expressions.
-This is rejected at compile time:
+Interop with Erlang modules:
 
 ```potion
-val age: int = 42
-val message = "Age: " + age
-```
-
-Use `to_string(...)` explicitly when you want textual concatenation:
-
-```potion
-val message = "Age: " + to_string(age)
-```
-
-### Erlang HTTP Interop
-```potion
-import erlang ssl
-import erlang inets
-import erlang httpc
+import erlang lists
 
 fn main() {
-    ssl.start()
-    inets.start()
-
-    val response = httpc.request("https://example.com")
-    print(response)
+    print(lists.reverse([1, 2, 3]))
 }
 ```
 
-This compiles to remote Erlang calls such as `ssl:start()`, `inets:start()`, and `httpc:request(...)`.
-For HTTPS requests, `ssl.start()` must run before `httpc.request(...)`.
+For syntax and semantics in detail, use [`docs/language-spec.md`](./docs/language-spec.md).
 
-For a full list of reserved keywords, builtins, types, and syntax rules, see [`docs/language-spec.md`](./docs/language-spec.md).
+## Install And Run
 
-### Current Syntax Summary
+Requirements:
 
-```potion
-val total: int = 10
-var fallback: none = none
-
-fn main() {
-    var approved: bool = false
-    approved = total >= 5
-
-    if approved {
-        print("ok")
-    } else {
-        print("not ok")
-    }
-
-    receive {
-        on ok(message) {
-            print(message)
-        }
-
-        on any {
-            print("ignored")
-        }
-    }
-}
-```
-
-Supported type names today:
-
-- `int`
-- `str`
-- `bool`
-- `none`
-- `pid`
-- `dynamic`
-
----
-
-## 🧰 CLI (`potionc`)
-
-`potionc` is a Python entry point that lives under `cli/potionc.py`.
-
-**Requirements**
 - Python 3.8+
-- Erlang/OTP (`erlc` and `erl` on your PATH)
+- Erlang/OTP with `erlc` and `erl` on `PATH`
 
-**Installation**
+Install for development:
+
 ```bash
-# development workflow: keep the command pointing at your local checkout
 pip install -e .
-
-# regular install
-pip install .
 ```
 
-After `pip install -e .`, changes in the compiler source are picked up by the installed `potionc` command without reinstalling after every edit.
+Basic usage:
 
-Package installation:
 ```bash
+potionc examples/01_values_and_functions.potion --run
+potionc examples/05_spawn_send_receive.potion
+potionc demo/main.potion --outdir demo/target --no-beam
+```
+
+Package install:
+
+```bash
+# Generate .deb installer
+bash packaging/packaging-potion-deb.sh
+
 # Debian/Ubuntu
 sudo apt install ./dist/potion-lang_0.1.0_all.deb
+
+# Generate .rpm installer
+bash packaging/packaging-potion-rpm.sh
 
 # Fedora/RHEL
 sudo dnf install ./dist/rpmbuild/RPMS/noarch/potion-lang-0.1.0-1.noarch.rpm
 ```
 
-Package generation:
-```bash
-# generate the .deb package
-bash packaging/packaging-potion-deb.sh
+## Current Status
 
-# generate the .rpm package
-bash packaging/packaging-potion-rpm.sh
-```
+- Experimental and still evolving
+- Breaking changes are possible while the syntax and compiler pipeline settle
+- Type checking is intentionally lightweight
+- Some practical capabilities currently rely on Erlang bridge modules instead of pure Potion
+- Erlang interop exists today, but function existence and arity are not validated by the compiler
 
-The scripts above generate installable packages that declare runtime dependencies on Python 3.8+ and Erlang/OTP. Use `apt` or `dnf` to install the generated files so the package manager can resolve those dependencies automatically.
+## Roadmap
 
-**Usage**
-```bash
-python -m cli.potionc path/to/file.potion [options]
-# after installing with `pip install -e .` or `pip install .` you can simply run:
-potionc path/to/file.potion [options]
-```
+- Done: typed `val`, typed `var`, typed parameters, `none`, maps, lists, `match`, `if`/`else`
+- Done: concurrency primitives, semantic analysis, CLI compile/run flow, sibling-module imports
+- In progress: broader language coverage, cleaner interop ergonomics, more complete static checks
+- Still missing: atom literals, tuple syntax, richer module system, direct BEAM generation without Erlang as an intermediate step
 
-**Options**
-- `--outdir DIR` – directory for generated `.erl`/`.beam` files (default: `target/`).
-- `--no-beam` – skip Erlang compilation, emit only the `.erl` file.
-- `--emit-ast` – print the parsed AST instead of generating code.
-- `--run` – after successful compilation, executes `module:main/0` inside `erl -noshell`.
+## Documentation
 
-**Examples**
-```bash
-# Transpile and compile
-python -m cli.potionc exemplo.potion
-
-# Generate only the .erl
-python -m cli.potionc send_message.potion --no-beam
-
-# Compile to a custom folder and run main/0
-python -m cli.potionc send_message.potion --outdir build --run
-
-# install the CLI in editable mode for development
-pip install -e .
-```
-
----
-
-## 🛠️ Compiler Architecture
-
-- **Lexer** → Tokenizes Potion source code.
-- **Parser** → Produces an AST with declarations, literals, control flow, and concurrency nodes.
-- **Codegen** → Walks the AST and emits human-friendly Erlang.
-- **CLI** → Glue that orchestrates parsing, code generation, `erlc`, and optional execution.
-
----
-
-## ⚡ Roadmap
-
-- [x] Optional typing on `val` declarations.
-- [x] Optional typing on `var` declarations.
-- [x] `none` literal support.
-- [x] Map literals with basic pattern matching.
-- [x] Concurrency primitives (`sp`, `send`, `receive`, `match`).
-- [x] Official CLI for transpile/compile/run.
-- [x] Reassignment / mutable update syntax for local `var`.
-- [x] Optional typing on function parameters.
-- [x] Basic module imports across `.potion` files in the same directory.
-- [ ] Lists, tuples, and richer collection literals.
-- [x] Semantic analyser and static checks.
-- [ ] Direct BEAM generation (skip intermediate Erlang).
-
----
-
-## 📐 Current Limits
-
-- Numeric literals are currently treated as integers in the parser and codegen.
-- `print(...)` currently expects a single argument.
-- Map keys must be bare identifiers and are emitted as Erlang atoms.
-- `var` is intended for function-local mutable state, not module-level mutable state.
-- Type checking is intentionally lightweight and still incomplete compared to a full standalone type system.
-- Imported `.potion` modules currently expose only functions, not imported global values.
-- Erlang interop currently supports only `import erlang <module>` and `<module>.<function>(...)`.
-- Erlang interop does not validate module existence, function existence, or arity.
-- Potion still has no atom literal syntax, so some Erlang APIs are callable but not fully ergonomic yet.
-
----
-
-## 🔥 Extended Example
-
-```potion
-val base: int = 10
-
-fn worker() {
-    receive {
-        on compute(value, caller) {
-            val doubled = value * 2
-            send(caller, {result: doubled + base})
-        }
-
-        on any {
-            print("unexpected")
-        }
-    }
-}
-
-fn main() {
-    val pid = sp worker()
-    send(pid, {compute: 5, reply_to: self()})
-
-    receive {
-        on result(total) {
-            print("Result: " + to_string(total))
-        }
-
-        on any {
-            print("No reply")
-        }
-    }
-}
-```
-
-→ Emits Erlang with macros, capitalized locals, map patterns, and message passing ready for the BEAM VM.
-
----
-
-## 📜 Philosophy
-
-- **Clarity over magic:** explicit transformations keep the learning curve gentle.
-- **Pedagogical focus:** demystify compilers, ASTs, and the BEAM toolchain.
-- **Interop first:** generated Erlang should play nicely with existing OTP code bases.
-
-> 🧪 Potion is still experimental; expect breaking changes while the language evolves.
+- [`docs/language-spec.md`](./docs/language-spec.md): current implemented syntax and semantics
+- [`docs/architecture.md`](./docs/architecture.md): lexer, parser, semantic analysis, codegen, and CLI pipeline
+- [`README-pt-br.md`](./README-pt-br.md): Portuguese overview
+- [`demo/README.md`](./demo/README.md): feature-server demo walkthrough
+- [`examples/README.md`](./examples/README.md): language examples
+- [`./.github/CONTRIBUTING.en.md`](./.github/CONTRIBUTING.en.md): contribution guide
+- [`./.github/CODE_OF_CONDUCT.en.md`](./.github/CODE_OF_CONDUCT.en.md): code of conduct

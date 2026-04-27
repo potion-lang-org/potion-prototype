@@ -177,3 +177,6 @@ cython_debug/
 *.erl
 *.beam
 *.dump
+
+# Mnesia
+demo/.mnesia/
