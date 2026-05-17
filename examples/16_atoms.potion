@@ -1,0 +1,28 @@
+val default_status: atom = :ok
+
+fn get_status() {
+    return :ok
+}
+
+fn describe(status: atom) {
+    if status == :ok {
+        return :accepted
+    } else {
+        return :rejected
+    }
+}
+
+fn main() {
+    val status: atom = get_status()
+    val response = {status: status, reason: :not_found}
+
+    if status == default_status {
+        print("status ok")
+    } else {
+        print("status error")
+    }
+
+    print(:not_found)
+    print(response)
+    print("description: " + to_string(describe(status)))
+}
