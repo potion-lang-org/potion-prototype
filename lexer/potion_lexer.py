@@ -12,6 +12,8 @@ TOKEN_SPEC = [
     ("GTE",        r">="),
     ("LT",         r"<"),
     ("GT",         r">"),
+    ("INVALID_ATOM", r":[a-z_][a-zA-Z0-9_]*-[^\s,\}\)\]]*|:[A-Z0-9][a-zA-Z0-9_]*"),
+    ("ATOM",       r":[a-z_][a-zA-Z0-9_]*"),
     ("NUMBER",     r"\d+(\.\d+)?"),
     ("STRING",     r'\".*?\"'),
     ("BOOL",       r'\btrue\b|\bfalse\b'),
@@ -66,6 +68,8 @@ def tokenize(code: str) -> List[Token]:
         value = match.group()
         if kind in ("WHITESPACE", "COMMENT"):
             continue
+        elif kind == "INVALID_ATOM":
+            raise RuntimeError(f"Invalid atom literal: {value}")
         elif kind == "MISMATCH":
             raise RuntimeError(f"Unexpected character: {value}")
         else:

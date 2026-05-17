@@ -15,6 +15,7 @@ Define the currently accepted lexical surface for identifiers, literals, comment
 val name: str = "Potion"
 val enabled: bool = true
 val count: int = 42
+val status = :ok
 ```
 
 Reserved words include `return`, `val`, `var`, `import`, `erlang`, `fn`, `sp`, `send`, `receive`, `on`, `when`, `any`, `match`, `none`, `if`, `else`, `true`, and `false`.
@@ -33,15 +34,17 @@ val path = module-name
 
 Identifiers name bindings, functions, modules, map keys, and receive tags. Whitespace separates tokens and is otherwise insignificant. Line comments begin with `//` and continue to the end of the line.
 
+Atoms use `:identifier` syntax. The identifier after `:` must start with a lowercase letter or underscore and may contain letters, numbers, and underscores.
+
 ## Current implementation notes
 
-The lexer is regex-based. Identifiers use `[a-zA-Z_][a-zA-Z0-9_]*`. Strings use double quotes. Integer-looking numbers are parsed as `LiteralInt`; the lexer pattern also accepts decimal-looking numbers, but the parser currently converts number tokens with `int(...)`.
+The lexer is regex-based. Identifiers use `[a-zA-Z_][a-zA-Z0-9_]*`. Atom literals use `:[a-z_][a-zA-Z0-9_]*`. Strings use double quotes. Integer-looking numbers are parsed as `LiteralInt`; the lexer pattern also accepts decimal-looking numbers, but the parser currently converts number tokens with `int(...)`.
 
 ## Guardrails
 
 - Decimal tokenization must not be documented as implemented float support.
 - The current permissive string regex is not a complete final string-literal design.
-- No atom, tuple, binary, char, or interpolation syntax exists today.
+- No tuple, binary, char, or interpolation syntax exists today.
 
 ## Acceptance examples
 
@@ -49,6 +52,7 @@ The lexer is regex-based. Identifiers use `[a-zA-Z_][a-zA-Z0-9_]*`. Strings use 
 val total: int = 10
 val message: str = "hello"
 val ok: bool = false
+val status: atom = :ok
 ```
 
 Expected current token categories include `VAL`, `ID`, `COLON`, `ID`, `ASSIGN`, `NUMBER`, `STRING`, and `BOOL`.

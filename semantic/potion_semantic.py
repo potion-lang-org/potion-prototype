@@ -8,6 +8,7 @@ from parser.potion_parser import (
     Identifier,
     ImportStatement,
     IfBlock,
+    LiteralAtom,
     LiteralBool,
     LiteralInt,
     ListLiteral,
@@ -34,6 +35,17 @@ class DynamicValue:
     pass
 
 
+class AtomValue:
+    def __init__(self, name):
+        self.name = name
+
+    def __eq__(self, other):
+        return isinstance(other, AtomValue) and self.name == other.name
+
+    def __ne__(self, other):
+        return not self == other
+
+
 class TypedValue:
     def __init__(self, type_name):
         self.type_name = type_name
@@ -47,6 +59,7 @@ TYPE_MAP = {
     "str": str,
     "bool": bool,
     "none": type(None),
+    "atom": AtomValue,
     "pid": PidValue,
     "dynamic": DynamicValue,
 }
@@ -57,6 +70,7 @@ REVERSE_TYPE_MAP = {
     str: "str",
     bool: "bool",
     type(None): "none",
+    AtomValue: "atom",
     PidValue: "pid",
     DynamicValue: "dynamic",
 }
@@ -144,6 +158,8 @@ class SemanticAnalyzer:
             return False
         if type_name == "none":
             return None
+        if type_name == "atom":
+            return AtomValue("placeholder")
         if type_name == "pid":
             return PidValue()
         if type_name == "dynamic":
@@ -265,6 +281,8 @@ class SemanticAnalyzer:
             return node.value
         if isinstance(node, LiteralNone):
             return None
+        if isinstance(node, LiteralAtom):
+            return AtomValue(node.value)
         if isinstance(node, BinaryOp):
             left = self.evaluate_expression(node.left)
             right = self.evaluate_expression(node.right)
@@ -335,6 +353,8 @@ class SemanticAnalyzer:
                     return "true" if value else "false"
                 if isinstance(value, str):
                     return value
+                if isinstance(value, AtomValue):
+                    return value.name
                 return str(value)
 
             if func_name not in self.functions:

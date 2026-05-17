@@ -7,6 +7,23 @@ RESERVED_WORDS = {
     "none": "undefined",
 }
 
+ERLANG_RESERVED_ATOMS = {
+    "after",
+    "begin",
+    "case",
+    "catch",
+    "cond",
+    "end",
+    "fun",
+    "if",
+    "let",
+    "of",
+    "query",
+    "receive",
+    "try",
+    "when",
+}
+
 class ErlangCodegen(SemanticAnalyzer):
     RECEIVE_EXTRA_FIELDS = ["reply_to"]
 
@@ -345,6 +362,8 @@ class ErlangCodegen(SemanticAnalyzer):
             return self.visit_LiteralStr(pattern)
         if isinstance(pattern, LiteralNone):
             return self.visit_LiteralNone(pattern)
+        if isinstance(pattern, LiteralAtom):
+            return self.visit_LiteralAtom(pattern)
         if isinstance(pattern, MapLiteral):
             return self.emit_pattern_map(pattern)
         return self.visit(pattern)
@@ -397,6 +416,9 @@ class ErlangCodegen(SemanticAnalyzer):
 
     def visit_LiteralNone(self, node):
         return "undefined"
+
+    def visit_LiteralAtom(self, node):
+        return self.emit_erlang_atom(node.value)
 
     def visit_Identifier(self, node):
         if node.name in RESERVED_WORDS:
@@ -468,6 +490,16 @@ class ErlangCodegen(SemanticAnalyzer):
         if key and key[0].islower() and all(ch.isalnum() or ch == '_' for ch in key):
             return key
         return f"'{key}'"
+
+    def emit_erlang_atom(self, name: str) -> str:
+        if (
+            name
+            and name[0].islower()
+            and name not in ERLANG_RESERVED_ATOMS
+            and all(ch.isalnum() or ch == '_' for ch in name)
+        ):
+            return name
+        return f"'{name}'"
 
     def is_string_expression(self, node):
         if isinstance(node, LiteralStr):

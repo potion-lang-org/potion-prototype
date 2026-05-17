@@ -123,6 +123,10 @@ class LiteralStr(ASTNode):
 class LiteralNone(ASTNode):
     pass
 
+class LiteralAtom(ASTNode):
+    def __init__(self, value):
+        self.value = value
+
 class Identifier(ASTNode):
     def __init__(self, name):
         self.name = name
@@ -194,7 +198,7 @@ class Parser:
             return self.return_statement()
         elif tok[0] == "ID" and self.peek()[0] == "ASSIGN":
             return self.assignment()
-        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LBRACKET", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE"):
+        elif tok[0] in ("ID", "SEND", "RECEIVE", "MATCH", "SP", "LBRACE", "LBRACKET", "LPAREN", "NUMBER", "STRING", "BOOL", "NONE", "ATOM"):
             return self.expression()
         else:
             self.pos += 1  # Skip unrecognized token
@@ -455,6 +459,9 @@ class Parser:
         elif tok_type == "NONE":
             self.eat("NONE")
             return LiteralNone()
+        elif tok_type == "ATOM":
+            self.eat("ATOM")
+            return LiteralAtom(tok_value[1:])
 
         elif tok_type == "ID":
             return self.identifier_expression()

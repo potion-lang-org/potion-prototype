@@ -57,12 +57,14 @@ Current type names accepted by the compiler:
 - `str`
 - `bool`
 - `none`
+- `atom`
 - `pid`
 - `dynamic`
 
 Notes:
 
 - `none` maps to Erlang `undefined`
+- `atom` maps to Erlang atoms
 - `pid` is intended for process ids such as the result of `self()` or `sp ...`
 - `dynamic` is used internally for values whose static type is not known precisely
 
@@ -74,6 +76,7 @@ Supported literals:
 - string literals, for example `"hello"`
 - boolean literals: `true`, `false`
 - `none`
+- atom literals, for example `:ok`, `:error`, and `:not_found`
 - map literals, for example `{name: "Bruce", age: 42}`
 - list literals, for example `[1, 2, 3]`
 
@@ -81,6 +84,7 @@ Current limitations:
 
 - numeric literals are parsed as integers
 - floating-point syntax is tokenized by the lexer but not represented as a separate numeric AST type
+- atom names must start with a lowercase letter or underscore, then contain only letters, numbers, and underscores
 - map keys must be bare identifiers
 
 ## Declarations
@@ -237,7 +241,7 @@ Current rules:
 Current limitations:
 
 - Erlang interop does not validate module existence, function existence, or arity
-- Potion still has no atom literal syntax, so some Erlang APIs are callable but not fully ergonomic yet
+- Potion still has no tuple, binary, or fun syntax, so some Erlang APIs are callable but not fully ergonomic yet
 
 ## Expressions
 
@@ -425,6 +429,30 @@ fn describe(name) {
     }
 }
 ```
+
+## Atoms
+
+Atoms are symbolic immutable values written with a `:` prefix.
+
+```potion
+val status: atom = :ok
+val error = :error
+val env = :prod
+```
+
+Atoms are emitted as Erlang atoms:
+
+```potion
+print(:not_found)
+```
+
+becomes:
+
+```erlang
+io:format("~p~n", [not_found])
+```
+
+Atoms can be used in declarations, function arguments, function calls, `return`, `print`, equality comparisons, comparisons used by `if` expressions, and map values.
 
 ## Maps, Lists, And Pattern Matching
 
@@ -629,6 +657,7 @@ Current important codegen conventions:
 - `match` becomes `case`
 - map literals become Erlang maps
 - list literals become Erlang lists
+- atom literals become Erlang atoms
 - map patterns use `:=`
 - string concatenation uses `++`
 - `print(...)` emits `io:format("~p~n", [...])`
@@ -658,7 +687,6 @@ Example:
 - Erlang interop is limited to `import erlang <module>` and `<module>.<function>(...)`
 - Erlang interop does not validate module existence, function existence, or arity
 - there is no tuple syntax yet
-- there is no atom literal syntax yet
 - type checking is lightweight and still tied to code generation
 - string concatenation depends on the compiler recognizing the expression as string-producing
 - there is no direct BEAM generation; Potion generates Erlang first

@@ -57,12 +57,14 @@ Nomes de tipos aceitos atualmente pelo compilador:
 - `str`
 - `bool`
 - `none`
+- `atom`
 - `pid`
 - `dynamic`
 
 Observações:
 
 - `none` vira `undefined` em Erlang
+- `atom` vira átomo Erlang
 - `pid` é voltado para process ids, como o retorno de `self()` ou `sp ...`
 - `dynamic` é usado internamente para valores cujo tipo estático não é conhecido com precisão
 
@@ -74,6 +76,7 @@ Literais suportados:
 - strings, por exemplo `"hello"`
 - booleanos: `true`, `false`
 - `none`
+- átomos, por exemplo `:ok`, `:error` e `:not_found`
 - mapas, por exemplo `{name: "Bruce", age: 42}`
 - listas, por exemplo `[1, 2, 3]`
 
@@ -81,6 +84,7 @@ Limites atuais:
 
 - literais numéricos são tratados como inteiros
 - a sintaxe de ponto flutuante é tokenizada pelo lexer, mas não vira um tipo numérico separado no AST
+- nomes de átomos precisam começar com letra minúscula ou underscore e conter apenas letras, números e underscores
 - chaves de mapa precisam ser identificadores simples
 
 ## Declarações
@@ -237,7 +241,7 @@ Regras atuais:
 Limites atuais:
 
 - o interop Erlang não valida existência de módulo, função nem aridade
-- Potion ainda não tem sintaxe de átomo, então algumas APIs de Erlang são chamáveis, mas ainda não são totalmente ergonômicas
+- Potion ainda não tem sintaxe de tupla, binário ou fun, então algumas APIs de Erlang são chamáveis, mas ainda não são totalmente ergonômicas
 
 ## Expressões
 
@@ -425,6 +429,30 @@ fn describe(name) {
     }
 }
 ```
+
+## Átomos
+
+Átomos são valores simbólicos imutáveis escritos com prefixo `:`.
+
+```potion
+val status: atom = :ok
+val error = :error
+val env = :prod
+```
+
+Átomos são emitidos como átomos Erlang:
+
+```potion
+print(:not_found)
+```
+
+vira:
+
+```erlang
+io:format("~p~n", [not_found])
+```
+
+Átomos podem ser usados em declarações, argumentos de função, chamadas de função, `return`, `print`, comparações de igualdade, comparações usadas por expressões `if` e valores de mapas.
 
 ## Mapas, Listas E Pattern Matching
 
@@ -629,6 +657,7 @@ Convenções importantes de codegen hoje:
 - `match` vira `case`
 - mapas viram maps Erlang
 - listas viram listas Erlang
+- átomos viram átomos Erlang
 - padrões de mapa usam `:=`
 - concatenação de string usa `++`
 - `print(...)` emite `io:format("~p~n", [...])`
@@ -658,7 +687,6 @@ Exemplo:
 - o interop Erlang está limitado a `import erlang <modulo>` e `<modulo>.<funcao>(...)`
 - o interop Erlang não valida existência de módulo, função nem aridade
 - ainda não existe sintaxe de tupla
-- ainda não existe sintaxe de átomo
 - a checagem de tipos é leve e continua acoplada à geração de código
 - concatenação de string depende de o compilador reconhecer a expressão como produtora de string
 - não há geração direta de BEAM; Potion gera Erlang primeiro

@@ -5,6 +5,7 @@ from parser.potion_parser import (
     ExternalModuleCall,
     FunctionDef,
     ImportStatement,
+    LiteralAtom,
     LiteralInt,
     LiteralNone,
     Parser,
@@ -32,6 +33,15 @@ class TestParser(unittest.TestCase):
         self.assertEqual(ast.statements[0].name, "current")
         self.assertEqual(ast.statements[0].type_annotation, "none")
         self.assertIsInstance(ast.statements[0].value, LiteralNone)
+
+    def test_atom_literal_parsing(self):
+        tokens = tokenize("val status: atom = :ok")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        self.assertIsInstance(ast.statements[0], ValDeclaration)
+        self.assertEqual(ast.statements[0].type_annotation, "atom")
+        self.assertIsInstance(ast.statements[0].value, LiteralAtom)
+        self.assertEqual(ast.statements[0].value.value, "ok")
 
     def test_assignment_statement(self):
         tokens = tokenize("""
