@@ -42,3 +42,18 @@ class TestLexer(unittest.TestCase):
         self.assertIn("ON", token_types)
         self.assertIn("WHEN", token_types)
         self.assertIn("ANY", token_types)
+
+    def test_atom_literal_tokens(self):
+        tokens = tokenize(":ok :error :not_found :http_404")
+        self.assertEqual(tokens, [
+            ("ATOM", ":ok"),
+            ("ATOM", ":error"),
+            ("ATOM", ":not_found"),
+            ("ATOM", ":http_404"),
+        ])
+
+    def test_invalid_atom_literals_raise(self):
+        for code in [":123", ":Invalid", ":hello-world"]:
+            with self.subTest(code=code):
+                with self.assertRaises(RuntimeError):
+                    tokenize(code)

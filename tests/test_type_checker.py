@@ -20,6 +20,31 @@ class TestTypeChecker(unittest.TestCase):
         codegen.type_checking(ast.statements[0])
         self.assertEqual(codegen.type_env["Current"], "none")
 
+    def test_atom_type_is_supported_and_inferred(self):
+        tokens = tokenize("val status = :ok")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        codegen = ErlangCodegen(ast)
+        codegen.type_checking(ast.statements[0])
+        self.assertEqual(codegen.type_env["Status"], "atom")
+
+    def test_atom_type_annotation_is_supported(self):
+        tokens = tokenize("val status: atom = :ok")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        codegen = ErlangCodegen(ast)
+        codegen.type_checking(ast.statements[0])
+        self.assertEqual(codegen.type_env["Status"], "atom")
+
+    def test_atom_rejects_int_annotation(self):
+        tokens = tokenize("val status: int = :ok")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.type_checking(ast.statements[0])
+        self.assertIn("esperado int, mas recebeu atom", str(ctx.exception))
+
     def test_function_param_comparison_can_type_check(self):
         code = """
         fn compare(a, b) {

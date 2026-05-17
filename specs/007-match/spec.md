@@ -42,7 +42,7 @@ Tuple and atom literal patterns do not exist today.
 
 ## Guardrails
 
-- Map-key atoms generated in Erlang are not Potion atom literals.
+- `:atom` literals exist as values, but this feature did not add new tuple-style atom pattern syntax.
 - There is no binary pattern matching today.
 - There is no tuple pattern syntax today.
 - Current use of `_` as an identifier pattern is parser/codegen convention, not a broader wildcard grammar.

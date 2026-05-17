@@ -35,7 +35,7 @@ The backend should preserve Potion source semantics when emitting executable cod
 
 ## Current implementation notes
 
-The current backend emits `.erl` modules with `-module(...)` and `-export(...)`. Top-level values are emitted as Erlang macros. Functions become Erlang functions. `+` becomes Erlang `+` for integer addition and `++` for known string concatenation. `/` becomes `div`. Maps and lists emit as Erlang maps and lists. `if`, `match`, and `receive` emit as `case` or `receive`. External Erlang calls emit as `module:function(...)`.
+The current backend emits `.erl` modules with `-module(...)` and `-export(...)`. Top-level values are emitted as Erlang macros. Functions become Erlang functions. `+` becomes Erlang `+` for integer addition and `++` for known string concatenation. `/` becomes `div`. Atoms emit as native Erlang atoms. Maps and lists emit as Erlang maps and lists. `if`, `match`, and `receive` emit as `case` or `receive`. External Erlang calls emit as `module:function(...)`.
 
 ## Guardrails
 

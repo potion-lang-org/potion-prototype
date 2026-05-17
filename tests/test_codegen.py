@@ -262,3 +262,96 @@ class TestCodegen(unittest.TestCase):
         codegen = ErlangCodegen(ast)
         erlang_code = codegen.generate()
         self.assertIn('Tid = ets:new("users", [])', erlang_code)
+
+    def test_atom_declaration_and_print_codegen(self):
+        code = """
+        val status: atom = :ok
+
+        fn main() {
+            print(:ok)
+            val response = {status: :not_found}
+            print(response)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("-define(STATUS, ok).", erlang_code)
+        self.assertIn('io:format("~p~n", [ok])', erlang_code)
+        self.assertIn("Response = #{status => not_found}", erlang_code)
+        self.assertNotIn('"ok"', erlang_code)
+
+    def test_atom_return_and_comparison_codegen(self):
+        code = """
+        fn get_status() {
+            return :ok
+        }
+
+        fn main() {
+            val status: atom = get_status()
+            if status == :ok {
+                print("status ok")
+            } else {
+                print("status error")
+            }
+            print(:not_found)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("get_status() ->\n    ok.", erlang_code)
+        self.assertIn("Status = get_status()", erlang_code)
+        self.assertIn("case (Status == ok) of", erlang_code)
+        self.assertIn('io:format("~p~n", [not_found])', erlang_code)
+        self.assertNotIn('"not_found"', erlang_code)
+
+    def test_atom_equality_semantics(self):
+        equal_code = """
+        fn main() {
+            val same: bool = :ok == :ok
+            print(same)
+        }
+        """
+        different_code = """
+        fn main() {
+            val same: bool = :ok == :error
+            print(same)
+        }
+        """
+
+        equal_erlang = ErlangCodegen(Parser(tokenize(equal_code)).parse()).generate()
+        different_erlang = ErlangCodegen(Parser(tokenize(different_code)).parse()).generate()
+
+        self.assertIn("Same = (ok == ok)", equal_erlang)
+        self.assertIn("Same = (ok == error)", different_erlang)
+
+    def test_external_erlang_module_call_codegen_with_atom_argument(self):
+        code = """
+        import erlang application
+
+        fn main() {
+            val result = application.ensure_all_started(:ssl)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("Result = application:ensure_all_started(ssl)", erlang_code)
+
+    def test_atom_codegen_quotes_atoms_that_are_not_bare_erlang_atoms(self):
+        code = """
+        fn main() {
+            print(:_private)
+            print(:receive)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("io:format(\"~p~n\", ['_private'])", erlang_code)
+        self.assertIn("io:format(\"~p~n\", ['receive'])", erlang_code)
