@@ -19,4 +19,5 @@ Files:
 - `13_modules_and_imports_main.potion` - entry module importing helper functions from another `.potion` file in the same directory.
 - `14_erlang_module_interop.potion` - generic interop with Erlang modules via `import erlang <module>` and `<module>.<function>(...)`.
 - `15_erlang_httpc_interop.potion` - HTTP example using Erlang `inets` and `httpc` through the generic interop syntax.
+- `16_atoms.potion` - atom literals in declarations, returns, comparisons, maps, printing and `to_string`.
 - `module_helpers.potion` - helper module used by `13_modules_and_imports_main.potion`.

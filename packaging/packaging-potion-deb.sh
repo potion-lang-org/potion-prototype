@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PACKAGE_NAME="potion-lang"
 BUILD_DIR="${PROJECT_ROOT}/dist"
+BUILD_VERSION="0.2.0"
 DEB_BUILD_ROOT="${PROJECT_ROOT}/dist/deb"
 
 check_command() {
@@ -51,7 +52,7 @@ chmod +x "${DEB_BUILD_ROOT}/usr/bin/potionc"
 echo "==> Gerando metadata DEBIAN/control..."
 cat > "${DEB_BUILD_ROOT}/DEBIAN/control" <<EOF
 Package: ${PACKAGE_NAME}
-Version: 0.1.0
+Version: ${BUILD_VERSION}
 Section: utils
 Priority: optional
 Architecture: all
@@ -64,7 +65,7 @@ EOF
 echo "==> Ajustando permissões..."
 chmod -R go-w "${DEB_BUILD_ROOT}"
 
-DEB_OUTPUT="${BUILD_DIR}/${PACKAGE_NAME}_0.1.0_all.deb"
+DEB_OUTPUT="${BUILD_DIR}/${PACKAGE_NAME}_${BUILD_VERSION}_all.deb"
 echo "==> Construindo pacote .deb em ${DEB_OUTPUT}..."
 dpkg-deb --build "${DEB_BUILD_ROOT}" "${DEB_OUTPUT}"
 
