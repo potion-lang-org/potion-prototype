@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PACKAGE_NAME="potion-lang"
 BUILD_DIR="${PROJECT_ROOT}/dist"
-BUILD_VERSION="0.2.0"
+BUILD_VERSION="0.3.0"
 DEB_BUILD_ROOT="${PROJECT_ROOT}/dist/deb"
 
 check_command() {

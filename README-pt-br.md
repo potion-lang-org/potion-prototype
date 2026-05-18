@@ -26,7 +26,7 @@ Potion não está tentando substituir Erlang ou Elixir. A direção atual é mai
 - Compilar código `.potion` em `.erl` e depois em `.beam`
 - Funções, `val`, `var` local de função e `return` explícito
 - Anotações básicas de tipo e checagens semânticas leves
-- Mapas, listas, `if`/`else`, `match` e `none`
+- Átomos, tuplas, mapas, listas, `if`/`else`, `match` e `none`
 - Imports entre módulos `.potion` irmãos
 - Interop com Erlang via `import erlang <modulo>`
 - Concorrência com `sp`, `send`, `receive` e `self()`
@@ -193,10 +193,10 @@ sudo dnf install ./dist/rpmbuild/RPMS/noarch/potion-lang-0.1.0-1.noarch.rpm
 
 ## Roadmap
 
-- Feito: `val` tipado, `var` tipado, parâmetros tipados, `none`, mapas, listas, `match`, `if`/`else`
+- Feito: `val` tipado, `var` tipado, parâmetros tipados, `none`, átomos, tuplas, mapas, listas, `match`, `if`/`else`
 - Feito: primitivas de concorrência, análise semântica, fluxo de CLI para compilar/rodar, imports entre módulos irmãos
 - Em andamento: cobertura maior da linguagem, ergonomia melhor de interop e checagens estáticas mais completas
-- Ainda falta: literais de átomo, sintaxe de tupla, sistema de módulos mais rico e geração direta de BEAM sem Erlang como etapa intermediária
+- Ainda falta: sistema de módulos mais rico e geração direta de BEAM sem Erlang como etapa intermediária
 
 ## Documentação
 

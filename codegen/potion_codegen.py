@@ -270,6 +270,10 @@ class ErlangCodegen(SemanticAnalyzer):
         elements = ", ".join(self.visit(element) for element in node.elements)
         return f"[{elements}]"
 
+    def visit_TupleLiteral(self, node: TupleLiteral):
+        elements = ", ".join(self.visit(element) for element in node.elements)
+        return "{" + elements + "}"
+
     def visit_ReceiveBlock(self, node: ReceiveBlock):
         merge_vars = self.collect_assigned_mutables(
             [stmt for clause in node.clauses for stmt in clause.body]
@@ -366,6 +370,8 @@ class ErlangCodegen(SemanticAnalyzer):
             return self.visit_LiteralAtom(pattern)
         if isinstance(pattern, MapLiteral):
             return self.emit_pattern_map(pattern)
+        if isinstance(pattern, TupleLiteral):
+            raise Exception("Pattern matching de tuple ainda não é suportado.")
         return self.visit(pattern)
 
     def emit_receive_pattern(self, clause: ReceiveClause):

@@ -58,6 +58,7 @@ Nomes de tipos aceitos atualmente pelo compilador:
 - `bool`
 - `none`
 - `atom`
+- `tuple`
 - `pid`
 - `dynamic`
 
@@ -65,6 +66,7 @@ Observações:
 
 - `none` vira `undefined` em Erlang
 - `atom` vira átomo Erlang
+- `tuple` vira tupla Erlang
 - `pid` é voltado para process ids, como o retorno de `self()` ou `sp ...`
 - `dynamic` é usado internamente para valores cujo tipo estático não é conhecido com precisão
 
@@ -77,6 +79,7 @@ Literais suportados:
 - booleanos: `true`, `false`
 - `none`
 - átomos, por exemplo `:ok`, `:error` e `:not_found`
+- tuplas, por exemplo `{:ok, 42}` e `{:error, "not found"}`
 - mapas, por exemplo `{name: "Bruce", age: 42}`
 - listas, por exemplo `[1, 2, 3]`
 
@@ -241,7 +244,7 @@ Regras atuais:
 Limites atuais:
 
 - o interop Erlang não valida existência de módulo, função nem aridade
-- Potion ainda não tem sintaxe de tupla, binário ou fun, então algumas APIs de Erlang são chamáveis, mas ainda não são totalmente ergonômicas
+- Potion ainda não tem sintaxe de binário ou fun, então algumas APIs de Erlang são chamáveis, mas ainda não são totalmente ergonômicas
 
 ## Expressões
 
@@ -254,6 +257,7 @@ Formas de expressão suportadas:
 - comparações
 - mapas
 - listas
+- tuplas
 - blocos `if`
 - blocos `match`
 - blocos `receive`
@@ -453,6 +457,36 @@ io:format("~p~n", [not_found])
 ```
 
 Átomos podem ser usados em declarações, argumentos de função, chamadas de função, `return`, `print`, comparações de igualdade, comparações usadas por expressões `if` e valores de mapas.
+
+## Tuplas
+
+Tuplas são valores posicionais imutáveis escritos com expressões separadas por vírgula dentro de chaves.
+
+```potion
+val result: tuple = {:ok, 42}
+val error = {:error, "not found"}
+val nested = {:ok, {:user, 10}}
+```
+
+Tuplas são emitidas como tuplas Erlang:
+
+```potion
+print({:ok, 42})
+```
+
+vira:
+
+```erlang
+io:format("~p~n", [{ok, 42}])
+```
+
+A sintaxe de tupla é distinta da sintaxe de mapa:
+
+- `{}` é o literal de mapa vazio existente
+- `{name: "Bruce"}` é um literal de mapa
+- `{:ok, 42}` e `{value, next}` são literais de tupla
+
+O suporte atual a tuplas não inclui destructuring, indexação de tupla, pattern matching de tupla, records, tuplas nomeadas nem tipos estruturais de tupla.
 
 ## Mapas, Listas E Pattern Matching
 
@@ -658,6 +692,7 @@ Convenções importantes de codegen hoje:
 - mapas viram maps Erlang
 - listas viram listas Erlang
 - átomos viram átomos Erlang
+- tuplas viram tuplas Erlang
 - padrões de mapa usam `:=`
 - concatenação de string usa `++`
 - `print(...)` emite `io:format("~p~n", [...])`
@@ -686,7 +721,7 @@ Exemplo:
 - módulos `.potion` importados não expõem bindings globais `val`
 - o interop Erlang está limitado a `import erlang <modulo>` e `<modulo>.<funcao>(...)`
 - o interop Erlang não valida existência de módulo, função nem aridade
-- ainda não existe sintaxe de tupla
+- pattern matching e destructuring de tupla ainda não existem
 - a checagem de tipos é leve e continua acoplada à geração de código
 - concatenação de string depende de o compilador reconhecer a expressão como produtora de string
 - não há geração direta de BEAM; Potion gera Erlang primeiro

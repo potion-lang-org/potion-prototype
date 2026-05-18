@@ -355,3 +355,91 @@ class TestCodegen(unittest.TestCase):
         erlang_code = codegen.generate()
         self.assertIn("io:format(\"~p~n\", ['_private'])", erlang_code)
         self.assertIn("io:format(\"~p~n\", ['receive'])", erlang_code)
+
+    def test_tuple_literal_codegen(self):
+        code = """
+        val result: tuple = {:ok, 123}
+
+        fn main() {
+            print({:ok, 42})
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("-define(RESULT, {ok, 123}).", erlang_code)
+        self.assertIn('io:format("~p~n", [{ok, 42}])', erlang_code)
+
+    def test_nested_tuple_literal_codegen(self):
+        code = """
+        fn main() {
+            val nested = {:ok, {:user, 10}}
+            print(nested)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("Nested = {ok, {user, 10}}", erlang_code)
+
+    def test_tuple_return_argument_variable_and_call_codegen(self):
+        code = """
+        fn get_value() {
+            return 42
+        }
+
+        fn get_result() {
+            return {:ok, get_value()}
+        }
+
+        fn wrap(result: tuple) {
+            return {:reply, result}
+        }
+
+        fn main() {
+            val result: tuple = get_result()
+            val wrapped = wrap(result)
+            val with_var = {:ok, result}
+            print(wrapped)
+            print(with_var)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("get_result() ->\n    {ok, get_value()}.", erlang_code)
+        self.assertIn("wrap(Result) ->\n    {reply, Result}.", erlang_code)
+        self.assertIn("Wrapped = wrap(Result)", erlang_code)
+        self.assertIn("With_var = {ok, Result}", erlang_code)
+
+    def test_tuple_equality_codegen(self):
+        code = """
+        fn main() {
+            val same: bool = {:ok, 1} == {:ok, 1}
+            print(same)
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        erlang_code = codegen.generate()
+        self.assertIn("Same = ({ok, 1} == {ok, 1})", erlang_code)
+
+    def test_tuple_pattern_matching_is_not_supported_yet(self):
+        code = """
+        fn main() {
+            match {:ok, 1} {
+                {:ok, 1} => print("ok")
+                _ => print("other")
+            }
+        }
+        """
+        tokens = tokenize(code)
+        ast = Parser(tokens).parse()
+        codegen = ErlangCodegen(ast)
+        with self.assertRaises(Exception) as ctx:
+            codegen.generate()
+        self.assertIn("Pattern matching de tuple ainda não é suportado", str(ctx.exception))

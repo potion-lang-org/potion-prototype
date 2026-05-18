@@ -10,6 +10,7 @@ from parser.potion_parser import (
     LiteralNone,
     Parser,
     ReceiveBlock,
+    TupleLiteral,
     ValDeclaration,
     VarDeclaration,
     tokenize,
@@ -42,6 +43,30 @@ class TestParser(unittest.TestCase):
         self.assertEqual(ast.statements[0].type_annotation, "atom")
         self.assertIsInstance(ast.statements[0].value, LiteralAtom)
         self.assertEqual(ast.statements[0].value.value, "ok")
+
+    def test_tuple_literal_parsing(self):
+        tokens = tokenize("val result: tuple = {:ok, 123}")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        tuple_literal = ast.statements[0].value
+        self.assertIsInstance(tuple_literal, TupleLiteral)
+        self.assertEqual(len(tuple_literal.elements), 2)
+        self.assertIsInstance(tuple_literal.elements[0], LiteralAtom)
+        self.assertIsInstance(tuple_literal.elements[1], LiteralInt)
+
+    def test_nested_tuple_literal_parsing(self):
+        tokens = tokenize("val nested = {:ok, {:user, 10}}")
+        parser = Parser(tokens)
+        ast = parser.parse()
+        tuple_literal = ast.statements[0].value
+        self.assertIsInstance(tuple_literal, TupleLiteral)
+        self.assertIsInstance(tuple_literal.elements[1], TupleLiteral)
+
+    def test_invalid_tuple_literals_raise(self):
+        for code in ["val trailing = {:ok,}", "val missing_first = {,123}"]:
+            with self.subTest(code=code):
+                with self.assertRaises(SyntaxError):
+                    Parser(tokenize(code)).parse()
 
     def test_assignment_statement(self):
         tokens = tokenize("""

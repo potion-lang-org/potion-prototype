@@ -30,7 +30,7 @@ match value {
 }
 ```
 
-Tuple and atom literal patterns do not exist today.
+Tuple patterns do not exist today.
 
 ## Semantics
 
@@ -42,7 +42,7 @@ Tuple and atom literal patterns do not exist today.
 
 ## Guardrails
 
-- `:atom` literals exist as values, but this feature did not add new tuple-style atom pattern syntax.
+- tuple literals exist as values, but tuple pattern matching is not implemented yet.
 - There is no binary pattern matching today.
 - There is no tuple pattern syntax today.
 - Current use of `_` as an identifier pattern is parser/codegen convention, not a broader wildcard grammar.

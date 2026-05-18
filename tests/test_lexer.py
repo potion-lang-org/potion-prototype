@@ -57,3 +57,13 @@ class TestLexer(unittest.TestCase):
             with self.subTest(code=code):
                 with self.assertRaises(RuntimeError):
                     tokenize(code)
+
+    def test_tuple_literal_reuses_brace_and_comma_tokens(self):
+        tokens = tokenize("{:ok, 123}")
+        self.assertEqual([kind for kind, _ in tokens], [
+            "LBRACE",
+            "ATOM",
+            "COMMA",
+            "NUMBER",
+            "RBRACE",
+        ])
