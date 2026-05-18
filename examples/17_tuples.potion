@@ -1,0 +1,24 @@
+fn get_result() {
+    return {:ok, 42}
+}
+
+fn get_error() {
+    return {:error, "not found"}
+}
+
+fn wrap_reply(result: tuple) {
+    return {:reply, result}
+}
+
+fn main() {
+    val result: tuple = get_result()
+    val error: tuple = get_error()
+    val nested = {:ok, {:user, 10}}
+    val wrapped = wrap_reply(result)
+
+    print(result)
+    print(error)
+    print(nested)
+    print(wrapped)
+    print({:noreply, nested})
+}

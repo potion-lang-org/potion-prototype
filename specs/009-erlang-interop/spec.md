@@ -46,7 +46,7 @@ The parser creates external module call nodes for `module.function(...)`. The se
 - The compiler does not validate that the function exists.
 - The compiler does not validate Erlang function arity.
 - Erlang bridge modules used by demos are support code for the POC, not Potion standard library design.
-- Missing tuple, binary, and fun syntax still limits ergonomic Erlang API usage today.
+- Missing binary and fun syntax still limits ergonomic Erlang API usage today.
 
 ## Acceptance examples
 

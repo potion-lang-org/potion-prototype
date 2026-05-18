@@ -22,6 +22,7 @@ from parser.potion_parser import (
     ReturnStatement,
     SendExpression,
     SpawnExpression,
+    TupleLiteral,
     ValDeclaration,
     VarDeclaration,
 )
@@ -46,6 +47,17 @@ class AtomValue:
         return not self == other
 
 
+class TupleValue:
+    def __init__(self, elements):
+        self.elements = elements
+
+    def __eq__(self, other):
+        return isinstance(other, TupleValue) and self.elements == other.elements
+
+    def __ne__(self, other):
+        return not self == other
+
+
 class TypedValue:
     def __init__(self, type_name):
         self.type_name = type_name
@@ -60,6 +72,7 @@ TYPE_MAP = {
     "bool": bool,
     "none": type(None),
     "atom": AtomValue,
+    "tuple": TupleValue,
     "pid": PidValue,
     "dynamic": DynamicValue,
 }
@@ -71,6 +84,7 @@ REVERSE_TYPE_MAP = {
     bool: "bool",
     type(None): "none",
     AtomValue: "atom",
+    TupleValue: "tuple",
     PidValue: "pid",
     DynamicValue: "dynamic",
 }
@@ -160,6 +174,8 @@ class SemanticAnalyzer:
             return None
         if type_name == "atom":
             return AtomValue("placeholder")
+        if type_name == "tuple":
+            return TupleValue([])
         if type_name == "pid":
             return PidValue()
         if type_name == "dynamic":
@@ -283,6 +299,8 @@ class SemanticAnalyzer:
             return None
         if isinstance(node, LiteralAtom):
             return AtomValue(node.value)
+        if isinstance(node, TupleLiteral):
+            return TupleValue([self.evaluate_expression(element) for element in node.elements])
         if isinstance(node, BinaryOp):
             left = self.evaluate_expression(node.left)
             right = self.evaluate_expression(node.right)
@@ -428,7 +446,7 @@ class SemanticAnalyzer:
         if isinstance(stmt, PrintCall):
             self.evaluate_expression(stmt.value)
             return DynamicValue()
-        if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral, ListLiteral, ExternalModuleCall)):
+        if isinstance(stmt, (SendExpression, ReceiveBlock, MatchExpression, SpawnExpression, MapLiteral, ListLiteral, TupleLiteral, ExternalModuleCall)):
             return self.evaluate_expression(stmt)
         if isinstance(stmt, ImportStatement):
             return DynamicValue()

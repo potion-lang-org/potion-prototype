@@ -22,12 +22,12 @@ fn main() {
 ## Invalid examples
 
 ```potion
-fn main() {
-    val pair = {ok, 1}
+match value {
+    {:ok, result} => print(result)
 }
 ```
 
-Tuple syntax cannot be generated because Potion does not currently parse tuple literals.
+Tuple values exist, but tuple pattern matching is not implemented yet.
 
 ## Semantics
 
@@ -35,7 +35,7 @@ The backend should preserve Potion source semantics when emitting executable cod
 
 ## Current implementation notes
 
-The current backend emits `.erl` modules with `-module(...)` and `-export(...)`. Top-level values are emitted as Erlang macros. Functions become Erlang functions. `+` becomes Erlang `+` for integer addition and `++` for known string concatenation. `/` becomes `div`. Atoms emit as native Erlang atoms. Maps and lists emit as Erlang maps and lists. `if`, `match`, and `receive` emit as `case` or `receive`. External Erlang calls emit as `module:function(...)`.
+The current backend emits `.erl` modules with `-module(...)` and `-export(...)`. Top-level values are emitted as Erlang macros. Functions become Erlang functions. `+` becomes Erlang `+` for integer addition and `++` for known string concatenation. `/` becomes `div`. Atoms emit as native Erlang atoms. Tuples emit as native Erlang tuples. Maps and lists emit as Erlang maps and lists. `if`, `match`, and `receive` emit as `case` or `receive`. External Erlang calls emit as `module:function(...)`.
 
 ## Guardrails
 

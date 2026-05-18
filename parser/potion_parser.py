@@ -66,6 +66,10 @@ class MapLiteral(ASTNode):
     def __init__(self, entries):
         self.entries = entries  # List of (key, value)
 
+class TupleLiteral(ASTNode):
+    def __init__(self, elements: List[ASTNode]):
+        self.elements = elements
+
 class SendExpression(ASTNode):
     def __init__(self, target: ASTNode, message: ASTNode):
         self.target = target
@@ -474,7 +478,7 @@ class Parser:
         elif tok_type == "SP":
             return self.spawn_expression()
         elif tok_type == "LBRACE":
-            return self.map_literal()
+            return self.braced_literal()
         elif tok_type == "LBRACKET":
             return self.list_literal()
 
@@ -519,6 +523,15 @@ class Parser:
             return tok_value
         raise SyntaxError(f"Tipo inválido: {self.current()}")
 
+    def braced_literal(self) -> ASTNode:
+        if self.peek()[0] == "RBRACE":
+            return self.map_literal()
+        if self.current()[0] == "LBRACE" and self.peek()[0] == "ID":
+            next_pos = self.pos + 2
+            if next_pos < len(self.tokens) and self.tokens[next_pos][0] == "COLON":
+                return self.map_literal()
+        return self.tuple_literal()
+
     def map_literal(self) -> MapLiteral:
         self.eat("LBRACE")
         entries = []
@@ -542,6 +555,19 @@ class Parser:
 
         self.eat("RBRACE")
         return MapLiteral(entries)
+
+    def tuple_literal(self) -> TupleLiteral:
+        self.eat("LBRACE")
+        elements = [self.expression()]
+        if self.current()[0] != "COMMA":
+            raise SyntaxError("Tupla deve conter ao menos dois elementos separados por vírgula")
+
+        while self.current()[0] == "COMMA":
+            self.eat("COMMA")
+            elements.append(self.expression())
+
+        self.eat("RBRACE")
+        return TupleLiteral(elements)
 
     def list_literal(self) -> ListLiteral:
         self.eat("LBRACKET")

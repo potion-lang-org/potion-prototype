@@ -58,6 +58,7 @@ Current type names accepted by the compiler:
 - `bool`
 - `none`
 - `atom`
+- `tuple`
 - `pid`
 - `dynamic`
 
@@ -65,6 +66,7 @@ Notes:
 
 - `none` maps to Erlang `undefined`
 - `atom` maps to Erlang atoms
+- `tuple` maps to Erlang tuples
 - `pid` is intended for process ids such as the result of `self()` or `sp ...`
 - `dynamic` is used internally for values whose static type is not known precisely
 
@@ -77,6 +79,7 @@ Supported literals:
 - boolean literals: `true`, `false`
 - `none`
 - atom literals, for example `:ok`, `:error`, and `:not_found`
+- tuple literals, for example `{:ok, 42}` and `{:error, "not found"}`
 - map literals, for example `{name: "Bruce", age: 42}`
 - list literals, for example `[1, 2, 3]`
 
@@ -241,7 +244,7 @@ Current rules:
 Current limitations:
 
 - Erlang interop does not validate module existence, function existence, or arity
-- Potion still has no tuple, binary, or fun syntax, so some Erlang APIs are callable but not fully ergonomic yet
+- Potion still has no binary or fun syntax, so some Erlang APIs are callable but not fully ergonomic yet
 
 ## Expressions
 
@@ -254,6 +257,7 @@ Supported expression forms:
 - comparisons
 - map literals
 - list literals
+- tuple literals
 - `if` blocks
 - `match` blocks
 - `receive` blocks
@@ -453,6 +457,36 @@ io:format("~p~n", [not_found])
 ```
 
 Atoms can be used in declarations, function arguments, function calls, `return`, `print`, equality comparisons, comparisons used by `if` expressions, and map values.
+
+## Tuples
+
+Tuples are immutable positional values written with comma-separated expressions inside braces.
+
+```potion
+val result: tuple = {:ok, 42}
+val error = {:error, "not found"}
+val nested = {:ok, {:user, 10}}
+```
+
+Tuples are emitted as Erlang tuples:
+
+```potion
+print({:ok, 42})
+```
+
+becomes:
+
+```erlang
+io:format("~p~n", [{ok, 42}])
+```
+
+Tuple syntax is distinct from maps:
+
+- `{}` is the existing empty map literal
+- `{name: "Bruce"}` is a map literal
+- `{:ok, 42}` and `{value, next}` are tuple literals
+
+Current tuple support does not include destructuring, tuple indexing, tuple pattern matching, records, named tuples, or structural tuple types.
 
 ## Maps, Lists, And Pattern Matching
 
@@ -658,6 +692,7 @@ Current important codegen conventions:
 - map literals become Erlang maps
 - list literals become Erlang lists
 - atom literals become Erlang atoms
+- tuple literals become Erlang tuples
 - map patterns use `:=`
 - string concatenation uses `++`
 - `print(...)` emits `io:format("~p~n", [...])`
@@ -686,7 +721,7 @@ Example:
 - imported `.potion` modules do not expose imported global `val` bindings
 - Erlang interop is limited to `import erlang <module>` and `<module>.<function>(...)`
 - Erlang interop does not validate module existence, function existence, or arity
-- there is no tuple syntax yet
+- tuple pattern matching and tuple destructuring are not implemented
 - type checking is lightweight and still tied to code generation
 - string concatenation depends on the compiler recognizing the expression as string-producing
 - there is no direct BEAM generation; Potion generates Erlang first
