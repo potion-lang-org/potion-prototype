@@ -22,7 +22,7 @@ fn describe(person) {
 }
 ```
 
-## Invalid examples
+## Tuple example
 
 ```potion
 match value {
@@ -30,22 +30,20 @@ match value {
 }
 ```
 
-Tuple patterns do not exist today.
-
 ## Semantics
 
-`match` compares a value against clauses in order. Supported current patterns include identifiers, `_`, integer, string, boolean, `none`, and map patterns. Identifier patterns bind values for use in the clause body. Map patterns match required keys and nested patterns.
+`match` compares a value against clauses in order. Supported current patterns include identifiers, `_`, integer, string, boolean, atom, `none`, map, tuple, and fixed-length list patterns. Identifier patterns bind values only within the clause body. Composite patterns can contain nested patterns. `=>` is the only Potion clause separator; `->` belongs exclusively to generated Erlang.
 
 ## Current implementation notes
 
 `match` compiles to Erlang `case`. Map literal syntax is reused for map patterns and emitted with `:=` in patterns. Reassignment of local `var` bindings inside clauses is merged after the generated `case`.
 
+The explicit pattern AST and the atom, tuple, and fixed-length list extensions are specified in `specs/016-pattern-matching/spec.md`.
+
 ## Guardrails
 
-- tuple literals exist as values, but tuple pattern matching is not implemented yet.
+- list patterns match fixed-length lists; cons patterns are not implemented.
 - There is no binary pattern matching today.
-- There is no tuple pattern syntax today.
-- Current use of `_` as an identifier pattern is parser/codegen convention, not a broader wildcard grammar.
 
 ## Acceptance examples
 
