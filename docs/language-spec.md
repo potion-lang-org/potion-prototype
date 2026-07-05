@@ -486,7 +486,7 @@ Tuple syntax is distinct from maps:
 - `{name: "Bruce"}` is a map literal
 - `{:ok, 42}` and `{value, next}` are tuple literals
 
-Current tuple support does not include destructuring, tuple indexing, tuple pattern matching, records, named tuples, or structural tuple types.
+Current tuple support does not include tuple indexing, records, named tuples, or structural tuple types. Tuples can be destructured in `match` patterns.
 
 ## Maps, Lists, And Pattern Matching
 
@@ -532,9 +532,11 @@ Supported pattern forms:
 
 - identifier bindings
 - `_` wildcard
-- literal integers, strings, and booleans
+- literal integers, strings, booleans, and atoms
 - `none`
 - nested map patterns
+- tuple patterns
+- fixed-length list patterns
 
 Example with nested patterns:
 
@@ -550,8 +552,11 @@ match request {
 
 Notes:
 
+- `=>` is the only Potion clause separator; `->` appears only in generated Erlang
 - a pattern key like `age` binds whatever is on the right-hand side, for example `age: years`
 - after that pattern, the bound variable is `years`, not `age`
+- identifier bindings are scoped to their branch and do not leak outside `match`
+- list patterns such as `[head, tail]` match lists with exactly that length; cons patterns are not implemented
 - `match` compiles to an Erlang `case`
 - if mutable `var` bindings are reassigned inside `match` branches, the compiler merges the final version after the control-flow expression
 
@@ -721,7 +726,7 @@ Example:
 - imported `.potion` modules do not expose imported global `val` bindings
 - Erlang interop is limited to `import erlang <module>` and `<module>.<function>(...)`
 - Erlang interop does not validate module existence, function existence, or arity
-- tuple pattern matching and tuple destructuring are not implemented
+- tuple and fixed-length list destructuring are available only in `match`
 - type checking is lightweight and still tied to code generation
 - string concatenation depends on the compiler recognizing the expression as string-producing
 - there is no direct BEAM generation; Potion generates Erlang first

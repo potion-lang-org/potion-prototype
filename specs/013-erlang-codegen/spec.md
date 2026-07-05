@@ -19,7 +19,7 @@ fn main() {
 }
 ```
 
-## Invalid examples
+## Pattern codegen example
 
 ```potion
 match value {
@@ -27,7 +27,7 @@ match value {
 }
 ```
 
-Tuple values exist, but tuple pattern matching is not implemented yet.
+Tuple patterns emit native Erlang tuple patterns. Fixed-length list patterns emit native Erlang list patterns.
 
 ## Semantics
 

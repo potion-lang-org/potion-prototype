@@ -67,3 +67,11 @@ class TestLexer(unittest.TestCase):
             "NUMBER",
             "RBRACE",
         ])
+
+    def test_match_arrow_token_is_fat_arrow_only(self):
+        tokens = tokenize('match value { 0 => "zero" _ => "other" }')
+        arrows = [token for token in tokens if token[0] == "ARROW"]
+        self.assertEqual(arrows, [("ARROW", "=>"), ("ARROW", "=>")])
+
+        thin_arrow_tokens = tokenize('match value { 0 -> "zero" }')
+        self.assertNotIn("ARROW", [kind for kind, _ in thin_arrow_tokens])

@@ -4,12 +4,17 @@ from parser.potion_parser import (
     ErlangImportStatement,
     ExternalModuleCall,
     FunctionDef,
+    IdentifierPattern,
     ImportStatement,
+    ListPattern,
     LiteralAtom,
     LiteralInt,
+    LiteralPattern,
     LiteralNone,
+    MatchExpression,
     Parser,
     ReceiveBlock,
+    TuplePattern,
     TupleLiteral,
     ValDeclaration,
     VarDeclaration,
@@ -172,3 +177,39 @@ class TestParser(unittest.TestCase):
         self.assertEqual(clause.tag, "data")
         self.assertEqual(clause.bindings, ["value", "caller"])
         self.assertIsNotNone(clause.guard)
+
+    def test_match_patterns_parsing(self):
+        ast = Parser(tokenize("""
+        match value {
+            0 => "zero"
+            name => name
+            {:ok, item} => item
+            [head, tail] => head
+            _ => "other"
+        }
+        """)).parse()
+
+        match = ast.statements[0]
+        self.assertIsInstance(match, MatchExpression)
+        self.assertIsInstance(match.clauses[0].pattern, LiteralPattern)
+        self.assertIsInstance(match.clauses[1].pattern, IdentifierPattern)
+        self.assertIsInstance(match.clauses[2].pattern, TuplePattern)
+        self.assertIsInstance(match.clauses[3].pattern, ListPattern)
+        self.assertEqual(match.clauses[2].pattern.elements[1].name, "item")
+
+    def test_match_rejects_expression_and_call_patterns(self):
+        invalid_sources = [
+            'match value { expected + 1 => "invalid" }',
+            'match value { load() => "invalid" }',
+        ]
+
+        for source in invalid_sources:
+            with self.subTest(source=source):
+                with self.assertRaises(SyntaxError):
+                    Parser(tokenize(source)).parse()
+
+    def test_match_rejects_erlang_thin_arrow(self):
+        source = 'match value { 0 -> "zero" _ -> "other" }'
+
+        with self.assertRaises(SyntaxError):
+            Parser(tokenize(source)).parse()
