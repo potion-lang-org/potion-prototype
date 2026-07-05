@@ -6,8 +6,10 @@ from parser.potion_parser import (
     FunctionCall,
     FunctionParam,
     Identifier,
+    IdentifierPattern,
     ImportStatement,
     IfBlock,
+    ListPattern,
     LiteralAtom,
     LiteralBool,
     LiteralInt,
@@ -15,6 +17,7 @@ from parser.potion_parser import (
     LiteralNone,
     LiteralStr,
     MapLiteral,
+    MapPattern,
     MatchExpression,
     MemberAccess,
     PrintCall,
@@ -22,6 +25,7 @@ from parser.potion_parser import (
     ReturnStatement,
     SendExpression,
     SpawnExpression,
+    TuplePattern,
     TupleLiteral,
     ValDeclaration,
     VarDeclaration,
@@ -288,6 +292,45 @@ class SemanticAnalyzer:
             self.variables = prev_variables
             self.type_env = prev_type_env
 
+    def collect_pattern_bindings(self, pattern):
+        if isinstance(pattern, IdentifierPattern):
+            return {pattern.name}
+        if isinstance(pattern, (TuplePattern, ListPattern)):
+            bindings = set()
+            for element in pattern.elements:
+                bindings |= self.collect_pattern_bindings(element)
+            return bindings
+        if isinstance(pattern, MapPattern):
+            bindings = set()
+            for _, value in pattern.entries:
+                bindings |= self.collect_pattern_bindings(value)
+            return bindings
+        return set()
+
+    def validate_match_expression(self, node):
+        self.evaluate_expression(node.value)
+
+        for clause in node.clauses:
+            prev_inside = self.inside_function
+            prev_locals = self.local_vars.copy()
+            prev_variables = self.variables.copy()
+            prev_type_env = self.type_env.copy()
+            bindings = self.collect_pattern_bindings(clause.pattern)
+
+            try:
+                self.inside_function = True
+                self.local_vars = prev_locals | bindings
+                self.variables = prev_variables.copy()
+                self.type_env = prev_type_env.copy()
+                for binding in bindings:
+                    self.variables[self.emit_local_name(binding)] = UNKNOWN
+                self.evaluate_block(clause.body)
+            finally:
+                self.inside_function = prev_inside
+                self.local_vars = prev_locals
+                self.variables = prev_variables
+                self.type_env = prev_type_env
+
     def evaluate_expression(self, node):
         if isinstance(node, LiteralInt):
             return node.value
@@ -408,7 +451,10 @@ class SemanticAnalyzer:
             for element in node.elements:
                 self.evaluate_expression(element)
             return DynamicValue()
-        if isinstance(node, (SendExpression, MatchExpression, MapLiteral)):
+        if isinstance(node, MatchExpression):
+            self.validate_match_expression(node)
+            return DynamicValue()
+        if isinstance(node, (SendExpression, MapLiteral)):
             return DynamicValue()
         if isinstance(node, SpawnExpression):
             return PidValue()

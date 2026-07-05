@@ -54,3 +54,65 @@ class TestIntegration(unittest.TestCase):
             result = subprocess.run(["erlc", erl_path.name], capture_output=True, text=True, cwd=tmpdir)
             self.assertEqual(result.returncode, 0, msg=result.stderr)
             self.assertTrue((Path(tmpdir) / f"{module_name}.beam").exists())
+
+    def test_pattern_matching_compiles_and_runs(self):
+        if shutil.which("erlc") is None or shutil.which("erl") is None:
+            self.skipTest("Erlang toolchain não está disponível no ambiente")
+
+        code = """
+        fn main() {
+            val value = "outer"
+            val response = {:ok, "Potion"}
+            val message = match response {
+                {:ok, value} => value
+                {:error, reason} => reason
+            }
+            val first = match ["head", "tail"] {
+                [head, tail] => head
+                _ => "empty"
+            }
+            val branch_value = match {:error, "branch"} {
+                {:ok, payload} => payload
+                {:error, payload} => payload
+            }
+            val shadowed = match {:ok, "inner"} {
+                {:ok, value} => value
+            }
+            print(message)
+            print(first)
+            print(value)
+            print(shadowed)
+            print(branch_value)
+        }
+        """
+        module_name = "integration_pattern_matching"
+        output = ErlangCodegen(
+            Parser(tokenize(code)).parse(), module_name=module_name
+        ).generate()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            erl_path = Path(tmpdir) / f"{module_name}.erl"
+            erl_path.write_text(output)
+            compile_result = subprocess.run(
+                ["erlc", erl_path.name], capture_output=True, text=True, cwd=tmpdir
+            )
+            self.assertEqual(compile_result.returncode, 0, msg=compile_result.stderr)
+
+            run_result = subprocess.run(
+                [
+                    "erl",
+                    "-noshell",
+                    "-pa",
+                    tmpdir,
+                    "-eval",
+                    f"{module_name}:main(), halt().",
+                ],
+                capture_output=True,
+                text=True,
+                cwd=tmpdir,
+            )
+            self.assertEqual(run_result.returncode, 0, msg=run_result.stderr)
+            self.assertEqual(
+                run_result.stdout,
+                '"Potion"\n"head"\n"outer"\n"inner"\n"branch"\n',
+            )

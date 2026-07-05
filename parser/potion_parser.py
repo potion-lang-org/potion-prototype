@@ -79,8 +79,38 @@ class SpawnExpression(ASTNode):
     def __init__(self, call: FunctionCall):
         self.call = call
 
+class Pattern(ASTNode):
+    pass
+
+class WildcardPattern(Pattern):
+    pass
+
+class LiteralPattern(Pattern):
+    def __init__(self, value: ASTNode):
+        self.value = value
+
+class IdentifierPattern(Pattern):
+    def __init__(self, name: str):
+        self.name = name
+
+class AtomPattern(Pattern):
+    def __init__(self, value: str):
+        self.value = value
+
+class TuplePattern(Pattern):
+    def __init__(self, elements: List[Pattern]):
+        self.elements = elements
+
+class ListPattern(Pattern):
+    def __init__(self, elements: List[Pattern]):
+        self.elements = elements
+
+class MapPattern(Pattern):
+    def __init__(self, entries):
+        self.entries = entries
+
 class MatchClause(ASTNode):
-    def __init__(self, pattern: ASTNode, body: List[ASTNode]):
+    def __init__(self, pattern: Pattern, body: List[ASTNode]):
         self.pattern = pattern
         self.body = body
 
@@ -385,7 +415,7 @@ class Parser:
         self.eat("LBRACE")
         clauses = []
         while self.current()[0] != "RBRACE":
-            pattern = self.expression()
+            pattern = self.pattern()
             self.eat("ARROW")
             clause_body = []
             if self.current()[0] == "LBRACE":
@@ -404,6 +434,87 @@ class Parser:
                 self.eat("COMMA")
         self.eat("RBRACE")
         return MatchExpression(value, clauses)
+
+    def pattern(self) -> Pattern:
+        tok_type, tok_value = self.current()
+
+        if tok_type == "ID":
+            self.eat("ID")
+            if tok_value == "_":
+                return WildcardPattern()
+            return IdentifierPattern(tok_value)
+        if tok_type == "NUMBER":
+            self.eat("NUMBER")
+            if "." in tok_value:
+                raise SyntaxError("Patterns numéricos suportam apenas inteiros")
+            return LiteralPattern(LiteralInt(int(tok_value)))
+        if tok_type == "STRING":
+            self.eat("STRING")
+            return LiteralPattern(LiteralStr(tok_value.strip('"')))
+        if tok_type == "BOOL":
+            self.eat("BOOL")
+            return LiteralPattern(LiteralBool(tok_value == "true"))
+        if tok_type == "NONE":
+            self.eat("NONE")
+            return LiteralPattern(LiteralNone())
+        if tok_type == "ATOM":
+            self.eat("ATOM")
+            return AtomPattern(tok_value[1:])
+        if tok_type == "LBRACKET":
+            return self.list_pattern()
+        if tok_type == "LBRACE":
+            return self.braced_pattern()
+
+        raise SyntaxError(f"Pattern inválido: {self.current()}")
+
+    def list_pattern(self) -> ListPattern:
+        self.eat("LBRACKET")
+        elements = []
+        if self.current()[0] != "RBRACKET":
+            elements.append(self.pattern())
+            while self.current()[0] == "COMMA":
+                self.eat("COMMA")
+                elements.append(self.pattern())
+        self.eat("RBRACKET")
+        return ListPattern(elements)
+
+    def braced_pattern(self) -> Pattern:
+        if self.peek()[0] == "RBRACE":
+            return self.map_pattern()
+        if self.peek()[0] == "ID":
+            next_pos = self.pos + 2
+            if next_pos < len(self.tokens) and self.tokens[next_pos][0] == "COLON":
+                return self.map_pattern()
+        return self.tuple_pattern()
+
+    def map_pattern(self) -> MapPattern:
+        self.eat("LBRACE")
+        entries = []
+        if self.current()[0] == "RBRACE":
+            self.eat("RBRACE")
+            return MapPattern(entries)
+
+        while True:
+            key = self.eat("ID")[1]
+            self.eat("COLON")
+            entries.append((key, self.pattern()))
+            if self.current()[0] != "COMMA":
+                break
+            self.eat("COMMA")
+
+        self.eat("RBRACE")
+        return MapPattern(entries)
+
+    def tuple_pattern(self) -> TuplePattern:
+        self.eat("LBRACE")
+        elements = [self.pattern()]
+        if self.current()[0] != "COMMA":
+            raise SyntaxError("Pattern de tupla deve conter ao menos dois elementos")
+        while self.current()[0] == "COMMA":
+            self.eat("COMMA")
+            elements.append(self.pattern())
+        self.eat("RBRACE")
+        return TuplePattern(elements)
 
     def expression(self) -> ASTNode:
         node = self.comparison()

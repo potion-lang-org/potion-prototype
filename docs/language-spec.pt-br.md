@@ -486,7 +486,7 @@ A sintaxe de tupla é distinta da sintaxe de mapa:
 - `{name: "Bruce"}` é um literal de mapa
 - `{:ok, 42}` e `{value, next}` são literais de tupla
 
-O suporte atual a tuplas não inclui destructuring, indexação de tupla, pattern matching de tupla, records, tuplas nomeadas nem tipos estruturais de tupla.
+O suporte atual a tuplas não inclui indexação de tupla, records, tuplas nomeadas nem tipos estruturais de tupla. Tuplas podem ser desconstruídas em patterns de `match`.
 
 ## Mapas, Listas E Pattern Matching
 
@@ -532,9 +532,11 @@ Formas de padrão suportadas:
 
 - binding por identificador
 - curinga `_`
-- inteiros, strings e booleanos literais
+- inteiros, strings, booleanos e atoms literais
 - `none`
 - padrões de mapa aninhados
+- patterns de tupla
+- patterns de lista com tamanho fixo
 
 Exemplo com padrões aninhados:
 
@@ -550,8 +552,11 @@ match request {
 
 Observações:
 
+- `=>` é o único separador de cláusula Potion; `->` aparece somente no Erlang gerado
 - uma chave de padrão como `age` faz binding do valor no identificador do lado direito, por exemplo `age: years`
 - depois disso, a variável disponível é `years`, não `age`
+- bindings por identificador pertencem ao escopo do branch e não vazam para fora do `match`
+- patterns como `[head, tail]` casam listas com exatamente esse tamanho; cons patterns ainda não existem
 - `match` compila para `case` em Erlang
 - se `var` mutáveis forem reatribuídas dentro de ramos de `match`, o compilador faz merge da versão final após a expressão de controle de fluxo
 
@@ -721,7 +726,7 @@ Exemplo:
 - módulos `.potion` importados não expõem bindings globais `val`
 - o interop Erlang está limitado a `import erlang <modulo>` e `<modulo>.<funcao>(...)`
 - o interop Erlang não valida existência de módulo, função nem aridade
-- pattern matching e destructuring de tupla ainda não existem
+- destructuring de tupla e lista de tamanho fixo está disponível somente em `match`
 - a checagem de tipos é leve e continua acoplada à geração de código
 - concatenação de string depende de o compilador reconhecer a expressão como produtora de string
 - não há geração direta de BEAM; Potion gera Erlang primeiro

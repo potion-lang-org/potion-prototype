@@ -107,3 +107,18 @@ class TestSemanticAnalyzer(unittest.TestCase):
         analyzer.evaluate_statement(ast.statements[0])
         value = analyzer.evaluate_statement(ast.statements[1].body[0])
         self.assertEqual(analyzer.infer_type(value), "dynamic")
+
+    def test_match_binding_is_available_only_inside_its_clause(self):
+        ast = Parser(tokenize("""
+        match {:ok, "Potion"} {
+            {:ok, value} => print(value)
+            _ => print("error")
+        }
+        value
+        """)).parse()
+        analyzer = SemanticAnalyzer()
+
+        analyzer.evaluate_expression(ast.statements[0])
+        with self.assertRaises(Exception) as ctx:
+            analyzer.evaluate_expression(ast.statements[1])
+        self.assertIn("Variável 'value' não declarada", str(ctx.exception))

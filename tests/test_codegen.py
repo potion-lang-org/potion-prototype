@@ -428,18 +428,86 @@ class TestCodegen(unittest.TestCase):
         erlang_code = codegen.generate()
         self.assertIn("Same = ({ok, 1} == {ok, 1})", erlang_code)
 
-    def test_tuple_pattern_matching_is_not_supported_yet(self):
+    def test_match_codegen_supports_literal_binding_tuple_and_list_patterns(self):
         code = """
         fn main() {
-            match {:ok, 1} {
-                {:ok, 1} => print("ok")
-                _ => print("other")
+            val integer = match 1 {
+                0 => "zero"
+                1 => "one"
+                _ => "many"
+            }
+            val string = match "hello" {
+                "hello" => true
+                _ => false
+            }
+            val boolean = match true {
+                true => :yes
+                false => :no
+            }
+            val atom = match :ok {
+                :ok => "success"
+                _ => "failure"
+            }
+            val tuple_value = match {:ok, "Potion"} {
+                {:ok, value} => value
+                {:error, reason} => reason
+            }
+            val list_value = match ["head", "tail"] {
+                [head, tail] => head
+                _ => "empty"
+            }
+            val map_value = match {status: :ok, payload: "map"} {
+                {status: :ok, payload: map_payload} => map_payload
+                _ => "missing"
+            }
+            match integer {
+                name => {
+                    print(name)
+                }
             }
         }
         """
-        tokens = tokenize(code)
-        ast = Parser(tokens).parse()
-        codegen = ErlangCodegen(ast)
-        with self.assertRaises(Exception) as ctx:
-            codegen.generate()
-        self.assertIn("Pattern matching de tuple ainda não é suportado", str(ctx.exception))
+        erlang_code = ErlangCodegen(Parser(tokenize(code)).parse()).generate()
+
+        self.assertIn("Integer = case 1 of", erlang_code)
+        self.assertIn('0 ->\n        "zero";', erlang_code)
+        self.assertIn('"hello" ->\n        true;', erlang_code)
+        self.assertIn("true ->\n        yes;", erlang_code)
+        self.assertIn("Atom = case ok of", erlang_code)
+        self.assertIn("ok ->\n        \"success\";", erlang_code)
+        self.assertIn("{ok, Value} ->", erlang_code)
+        self.assertIn("[Head, Tail] ->", erlang_code)
+        self.assertIn("#{status := ok, payload := Map_payload} ->", erlang_code)
+        self.assertIn("Name ->", erlang_code)
+        self.assertIn('io:format("~p~n", [Name])', erlang_code)
+
+    def test_match_binding_shadows_outer_local_without_leaking_erlang_binding(self):
+        code = """
+        fn main() {
+            val value = "outer"
+            val result = match {:ok, "inner"} {
+                {:ok, value} => value
+            }
+            print(value)
+            print(result)
+        }
+        """
+        erlang_code = ErlangCodegen(Parser(tokenize(code)).parse()).generate()
+
+        self.assertIn("{ok, Value_Match1} ->", erlang_code)
+        self.assertIn("Result = case", erlang_code)
+        self.assertIn('io:format("~p~n", [Value])', erlang_code)
+
+    def test_match_branches_have_independent_bindings_with_the_same_name(self):
+        code = """
+        fn unwrap(result) {
+            return match result {
+                {:ok, payload} => payload
+                {:error, payload} => payload
+            }
+        }
+        """
+        erlang_code = ErlangCodegen(Parser(tokenize(code)).parse()).generate()
+
+        self.assertIn("{ok, Payload} ->", erlang_code)
+        self.assertIn("{error, Payload_Match1} ->", erlang_code)

@@ -55,7 +55,7 @@ The lexer recognizes valid atom literals as `ATOM` tokens. The parser stores the
 ## Guardrails
 
 - Atom literals do not add tuple syntax.
-- Atom literals do not add new pattern-matching forms in this feature.
+- Atom literals are supported as literal patterns in `match`.
 - Atom literals do not add binary pattern matching.
 - Atom literals do not add lambdas or Erlang fun syntax.
 - Atom literals do not change `receive` syntax.
