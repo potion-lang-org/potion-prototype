@@ -38,7 +38,7 @@ The parser has a `ListLiteral` AST node. Codegen emits Erlang list syntax direct
 ## Guardrails
 
 - Direct Erlang list emission is a backend detail.
-- No final list type syntax, element type checking, pattern matching, or cons syntax is defined yet.
+- No final list type syntax, element type checking, or cons syntax is defined yet. `match` supports fixed-length list patterns.
 - Lists being Erlang strings in some contexts is an Erlang interop fact, not a complete Potion string/list design.
 
 ## Acceptance examples

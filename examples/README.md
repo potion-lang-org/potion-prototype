@@ -21,4 +21,5 @@ Files:
 - `15_erlang_httpc_interop.potion` - HTTP example using Erlang `inets` and `httpc` through the generic interop syntax.
 - `16_atoms.potion` - atom literals in declarations, returns, comparisons, maps, printing and `to_string`.
 - `17_tuples.potion` - tuple literals for Erlang-style `{:ok, value}`, `{:error, reason}` and reply shapes.
+- `016_pattern_matching.potion` - `match` expressions with atoms, tuples, wildcard and branch-local bindings.
 - `module_helpers.potion` - helper module used by `13_modules_and_imports_main.potion`.

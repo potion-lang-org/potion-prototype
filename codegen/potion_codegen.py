@@ -36,6 +36,14 @@ class ErlangCodegen(SemanticAnalyzer):
         self.global_vars = []
         self.uses_to_string_builtin = False
         self.external_functions = external_functions or {}
+        self.pattern_binding_scopes = []
+        self.pattern_binding_counter = 0
+
+    def emit_name(self, name):
+        for scope in reversed(self.pattern_binding_scopes):
+            if name in scope:
+                return scope[name]
+        return super().emit_name(name)
 
     def generate(self) -> str:
         self.collect_function_names_and_globals(self.ast)
@@ -315,13 +323,28 @@ class ErlangCodegen(SemanticAnalyzer):
 
     def generate_match_clause(self, clause: MatchClause, merge_vars, start_versions):
         self.var_versions = start_versions.copy()
-        pattern_code = self.emit_pattern(clause.pattern)
         prev_locals = self.local_vars.copy()
         bindings = self.collect_pattern_bindings(clause.pattern)
-        self.local_vars |= bindings
-        clause_body, end_versions = self.emit_branch_body(clause.body, merge_vars, start_versions)
+        binding_scope = {}
+        for binding in sorted(bindings):
+            if binding in prev_locals:
+                self.pattern_binding_counter += 1
+                binding_scope[binding] = (
+                    f"{self.emit_local_name(binding)}_Match{self.pattern_binding_counter}"
+                )
+            else:
+                binding_scope[binding] = self.emit_local_name(binding)
 
-        self.local_vars = prev_locals
+        self.pattern_binding_scopes.append(binding_scope)
+        try:
+            self.local_vars |= bindings
+            pattern_code = self.emit_pattern(clause.pattern)
+            clause_body, end_versions = self.emit_branch_body(
+                clause.body, merge_vars, start_versions
+            )
+        finally:
+            self.pattern_binding_scopes.pop()
+            self.local_vars = prev_locals
 
         formatted_body = self.format_with_indent(clause_body, "        ")
         return f"    {pattern_code} ->\n{formatted_body}", end_versions
@@ -341,22 +364,26 @@ class ErlangCodegen(SemanticAnalyzer):
         formatted_body = self.format_with_indent(clause_body, "        ")
         return f"    {pattern_code}{guard_code} ->\n{formatted_body}", end_versions
 
-    def collect_pattern_bindings(self, pattern):
-        bindings = set()
-        if isinstance(pattern, Identifier):
-            if pattern.name != "_" and pattern.name not in self.global_var_names:
-                bindings.add(pattern.name)
-        elif isinstance(pattern, MapLiteral):
-            for _, value in pattern.entries:
-                bindings |= self.collect_pattern_bindings(value)
-        return bindings
-
     def emit_pattern(self, pattern):
+        if isinstance(pattern, WildcardPattern):
+            return "_"
+        if isinstance(pattern, IdentifierPattern):
+            return self.emit_name(pattern.name)
+        if isinstance(pattern, LiteralPattern):
+            return self.visit(pattern.value)
+        if isinstance(pattern, AtomPattern):
+            return self.emit_erlang_atom(pattern.value)
+        if isinstance(pattern, TuplePattern):
+            return "{" + ", ".join(self.emit_pattern(item) for item in pattern.elements) + "}"
+        if isinstance(pattern, ListPattern):
+            return "[" + ", ".join(self.emit_pattern(item) for item in pattern.elements) + "]"
+        if isinstance(pattern, MapPattern):
+            return self.emit_pattern_map(pattern)
+
+        # Receive patterns still use expression AST nodes internally.
         if isinstance(pattern, Identifier):
             if pattern.name == "_":
                 return "_"
-            if pattern.name in self.global_var_names:
-                return f"?{pattern.name.upper()}"
             return self.emit_local_name(pattern.name)
         if isinstance(pattern, LiteralBool):
             return self.visit_LiteralBool(pattern)
@@ -370,8 +397,6 @@ class ErlangCodegen(SemanticAnalyzer):
             return self.visit_LiteralAtom(pattern)
         if isinstance(pattern, MapLiteral):
             return self.emit_pattern_map(pattern)
-        if isinstance(pattern, TupleLiteral):
-            raise Exception("Pattern matching de tuple ainda não é suportado.")
         return self.visit(pattern)
 
     def emit_receive_pattern(self, clause: ReceiveClause):

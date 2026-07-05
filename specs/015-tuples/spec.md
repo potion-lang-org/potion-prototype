@@ -33,7 +33,9 @@ val missing_first = {,123}
 
 Tuples are immutable ordered values. They preserve positional order and can contain expressions such as integers, booleans, strings, atoms, lists, tuples, variables, and function calls. Float values are intended tuple elements once Potion has real float literal support; the current parser still does not represent floats as a separate AST type.
 
-Tuples have type `tuple`. Potion does not currently support tuple arity validation, structural tuple types, tuple indexing, destructuring, records, or named tuples.
+Tuples have type `tuple`. Potion supports tuple destructuring in `match`
+patterns. It does not currently support tuple arity validation, structural
+tuple types, tuple indexing, records, or named tuples.
 
 Potion tuples map directly to Erlang tuples. `{:ok, 123}` in Potion emits `{ok, 123}` in Erlang. Tuples are not converted to maps or lists.
 
@@ -51,8 +53,7 @@ Tuple literals can contain any expression that the current expression parser alr
 
 ## Guardrails
 
-- This feature does not add new pattern matching.
-- This feature does not add destructuring.
+- Tuple destructuring is limited to `match` patterns.
 - This feature does not add tuple indexing.
 - This feature does not add named tuples, records, or structs.
 - This feature does not add advanced tuple typing such as `tuple<int, str>`.

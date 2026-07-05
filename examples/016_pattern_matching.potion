@@ -1,0 +1,19 @@
+val status = :ok
+
+val message = match status {
+    :ok => "success"
+    :error => "failure"
+    _ => "unknown"
+}
+
+fn main() {
+    print(message)
+
+    val response = {:ok, "Potion"}
+    val response_message = match response {
+        {:ok, value} => value
+        {:error, reason} => reason
+    }
+
+    print(response_message)
+}

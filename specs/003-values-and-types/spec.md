@@ -39,7 +39,7 @@ The semantic analyzer maps known type names to simple Python placeholder values.
 
 - `dynamic` is mainly a current analyzer escape hatch, not a finished type-system design.
 - Erlang atoms created from map keys are separate from Potion's `:atom` literal syntax.
-- Tuple support does not include destructuring, tuple indexing, or structural tuple typing yet.
+- Tuple destructuring is currently available in `match`; tuple indexing and structural tuple typing are not implemented.
 - Current integer-only numeric behavior should not be treated as the final numeric tower.
 
 ## Acceptance examples
